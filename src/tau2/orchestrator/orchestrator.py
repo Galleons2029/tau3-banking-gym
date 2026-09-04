@@ -1,11 +1,9 @@
-import json
 import time
 import uuid
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from datetime import datetime, timedelta
 from enum import Enum
-from pathlib import Path
 from typing import Any, Generic, Optional, TypeVar
 
 from loguru import logger
@@ -27,7 +25,6 @@ from tau2.data_model.message import (
 from tau2.data_model.simulation import SimulationRun, TerminationReason
 from tau2.data_model.tasks import EnvFunctionCall, InitializationData, Task
 from tau2.environment.environment import Environment, EnvironmentInfo
-from tau2.orchestrator.modes import CommunicationMode
 from tau2.user.user_simulator import DummyUser, UserSimulator, UserState
 from tau2.user.user_simulator_base import (
     HalfDuplexUser,
@@ -66,14 +63,13 @@ class BaseOrchestrator(ABC, Generic[BaseAgentT, BaseUserT, TrajectoryItemT]):
     Abstract base class for orchestrators.
 
     Provides the common infrastructure for managing simulations between Agent, User,
-    and Environment. Subclasses implement specific communication patterns:
-    - Orchestrator: Half-duplex (turn-based) communication, trajectory of Messages
-    - FullDuplexOrchestrator: Full-duplex (streaming) communication, trajectory of Ticks
+    and Environment. `Orchestrator` implements half-duplex (turn-based)
+    communication with a trajectory of Messages.
 
     Type Parameters:
         BaseAgentT: The agent type
         BaseUserT: The user type
-        TrajectoryItemT: The trajectory item type (Message for half-duplex, Tick for full-duplex)
+        TrajectoryItemT: The trajectory item type (Message for half-duplex)
 
     Shared Responsibilities:
         - Environment initialization and tool execution
@@ -155,9 +151,7 @@ class BaseOrchestrator(ABC, Generic[BaseAgentT, BaseUserT, TrajectoryItemT]):
         """
         Perform one step of the simulation.
 
-        Subclasses implement their communication pattern:
-        - Half-duplex: Turn-based message passing
-        - Full-duplex: Simultaneous chunk generation
+        `Orchestrator` implements turn-based message passing.
         """
         pass
 
@@ -167,9 +161,8 @@ class BaseOrchestrator(ABC, Generic[BaseAgentT, BaseUserT, TrajectoryItemT]):
         Get the trajectory of the simulation.
 
         Returns:
-            List of trajectory items. Type depends on orchestrator mode:
-            - Orchestrator (half-duplex): list[Message]
-            - FullDuplexOrchestrator: list[Tick]
+            List of trajectory items: `list[Message]` for the half-duplex
+            `Orchestrator`.
         """
         pass
 
@@ -178,9 +171,7 @@ class BaseOrchestrator(ABC, Generic[BaseAgentT, BaseUserT, TrajectoryItemT]):
         """
         Get all messages from the simulation as a flat list.
 
-        This provides a consistent way to get messages regardless of orchestrator mode.
         For half-duplex, this is the same as get_trajectory().
-        For full-duplex, this returns linearized messages from all ticks.
 
         Returns:
             List of all messages sorted by timestamp with turn_idx assigned.
@@ -410,8 +401,7 @@ class Orchestrator(BaseOrchestrator[AgentT, UserT, Message]):
         Initialize the Orchestrator for managing simulation between Agent, User, and Environment.
 
         This orchestrator implements half-duplex (turn-based) communication where agent and user
-        alternate sending complete messages. For streaming/full-duplex communication, use
-        FullDuplexOrchestrator instead.
+        alternate sending complete messages.
 
         Args:
             domain: The domain name of the simulation (e.g., 'airline', 'retail', 'telecom').
@@ -444,7 +434,7 @@ class Orchestrator(BaseOrchestrator[AgentT, UserT, Message]):
         )
 
         # Half-duplex specific attributes
-        self.mode = CommunicationMode.HALF_DUPLEX
+        self.mode = "half_duplex"
         self.trajectory: list[Message] = []
         self.solo_mode = solo_mode
         self.validate_communication = validate_communication
@@ -788,17 +778,6 @@ class Orchestrator(BaseOrchestrator[AgentT, UserT, Message]):
         duration = time.perf_counter() - self._run_start_perf
         messages = self.get_trajectory()
         agent_cost, user_cost = get_cost(messages)
-        # Update voice metadata with final turn_idx values
-        self._finalize_voice_metadata(messages)
-
-        # Get speech_environment from user's voice_settings if available
-        speech_environment = None
-        if (
-            hasattr(self.user, "voice_settings")
-            and self.user.voice_settings is not None
-        ):
-            speech_environment = self.user.voice_settings.speech_environment
-
         simulation_run = SimulationRun(
             id=self.simulation_id,
             task_id=self.task.id,
@@ -811,8 +790,7 @@ class Orchestrator(BaseOrchestrator[AgentT, UserT, Message]):
             agent_cost=agent_cost,
             messages=messages,
             seed=self.seed,
-            mode=self.mode.value,
-            speech_environment=speech_environment,
+            mode=self.mode,
         )
         return simulation_run
 
@@ -841,9 +819,6 @@ class Orchestrator(BaseOrchestrator[AgentT, UserT, Message]):
             if UserSimulator.is_stop(user_msg):
                 self.done = True
                 self.termination_reason = TerminationReason.USER_STOP
-            # Update voice metadata if audio was generated
-            self._update_voice_metadata(user_msg)
-
             self.trajectory.append(user_msg)
             self.message = user_msg
             self.from_role = Role.USER
@@ -975,52 +950,3 @@ class Orchestrator(BaseOrchestrator[AgentT, UserT, Message]):
                 time_offset + timedelta(seconds=i), use_compact_format=False
             )
         return message_history
-
-    def _update_voice_metadata(self, message: UserMessage) -> None:
-        """
-        Update voice metadata with simulation ID.
-        Note: turn_idx is not available until get_trajectory() is called.
-        """
-        # Check if message has voice UUID (set during synthesis)
-        if (
-            hasattr(message, "_voice_uuid")
-            and message.audio_path
-            and self.simulation_id
-        ):
-            voice_uuid = message._voice_uuid
-            audio_dir = Path(message.audio_path).parent
-            metadata_path = audio_dir / "metadata.json"
-
-            metadata = {
-                "simulation_id": self.simulation_id,
-                "timestamp": message.timestamp,
-                "turn_uuid": voice_uuid,
-            }
-
-            with open(metadata_path, "w") as f:
-                json.dump(metadata, f, indent=2)
-
-    def _finalize_voice_metadata(self, messages: list[Message]) -> None:
-        """
-        Update all voice metadata files with final turn_idx values.
-        """
-        for msg in messages:
-            if (
-                isinstance(msg, UserMessage)
-                and hasattr(msg, "_voice_uuid")
-                and msg.audio_path
-            ):
-                audio_dir = Path(msg.audio_path).parent
-                metadata_path = audio_dir / "metadata.json"
-
-                if metadata_path.exists():
-                    # Read existing metadata
-                    with open(metadata_path, "r") as f:
-                        metadata = json.load(f)
-
-                    # Update with turn_idx
-                    metadata["turn_idx"] = msg.turn_idx
-
-                    # Write back
-                    with open(metadata_path, "w") as f:
-                        json.dump(metadata, f, indent=2)

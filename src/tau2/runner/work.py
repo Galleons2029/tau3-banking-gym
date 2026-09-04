@@ -28,7 +28,7 @@ DEFAULT_UNIT_ATTEMPTS = 2
 
 # Leases are kept alive by heartbeats (a dedicated worker thread beats every
 # ~30s), so the TTL only needs to outlive a heartbeat gap, not a simulation.
-# 300s = 10 missed beats: on a loaded host running many voice sims, a few
+# 300s = 10 missed beats: on a loaded host running many sims, a few
 # slow beats must not expire a live lease — the first field run showed a
 # requeued-while-alive sim costs a full duplicate execution.
 DEFAULT_LEASE_TTL_SECONDS = 300.0

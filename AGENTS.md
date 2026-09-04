@@ -4,13 +4,12 @@
 
 ## Project Overview
 
-τ-bench is a simulation framework for evaluating conversational customer service agents. It supports text and voice interactions in half-duplex (turn-based) and full-duplex (simultaneous/streaming) communication modes. Domains include `mock`, `airline`, `retail`, `telecom`, and `banking_knowledge`.
+τ-bench is a simulation framework for evaluating conversational customer service agents. It runs text half-duplex (turn-based) simulations. Domains include `mock`, `airline`, `retail`, `telecom`, and `banking_knowledge`.
 
 ## Setup
 
 ```bash
 uv sync                        # core only (airline, retail, telecom, mock)
-uv sync --extra voice          # + voice/audio-native features
 uv sync --extra knowledge      # + banking_knowledge domain (retrieval pipeline)
 uv sync --extra gym            # + gymnasium RL interface
 uv sync --extra dev            # + pytest, ruff, pre-commit (required for committing)
@@ -25,15 +24,12 @@ Environment variables: copy `.env.example` to `.env` and set API keys. Uses [Lit
 
 Required keys depend on the task:
 - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` — for LLM-based agents and user simulators
-- `ELEVENLABS_API_KEY` — voice synthesis
-- `DEEPGRAM_API_KEY` — voice transcription
 
 ## Common Commands
 
 | Command | What it does | Required install |
 |---------|-------------|-----------------|
-| `make test` | Run core tests (skips voice, streaming, gym, banking_knowledge) | `uv sync --extra dev` |
-| `make test-voice` | Run voice + streaming tests | `uv sync --extra voice --extra dev` |
+| `make test` | Run core tests (skips gym, banking_knowledge) | `uv sync --extra dev` |
 | `make test-knowledge` | Run banking_knowledge tests | `uv sync --extra knowledge --extra dev` |
 | `make test-gym` | Run gymnasium tests | `uv sync --extra gym --extra dev` |
 | `make test-all` | Run all tests | `uv sync --all-extras` |
@@ -44,16 +40,13 @@ Required keys depend on the task:
 | `make clean` | Remove venv, caches, build artifacts | — |
 | `make env-cli` | Interactive environment CLI for testing domain tools | — |
 
-`make test` is the safe default -- it works with just `uv sync --extra dev` and does not require voice, knowledge, or gym packages. Always run `make check-all` before committing. A pre-commit hook enforces this.
+`make test` is the safe default -- it works with just `uv sync --extra dev` and does not require knowledge or gym packages. Always run `make check-all` before committing. A pre-commit hook enforces this.
 
 ## Running Evaluations
 
 ```bash
-# Text half-duplex (standard)
+# Standard text run
 tau2 run --domain airline --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 1 --num-tasks 5
-
-# Voice full-duplex (audio native)
-tau2 run --domain retail --audio-native --num-tasks 1 --verbose-logs
 
 # Knowledge domain (requires --retrieval-config)
 tau2 run --domain banking_knowledge --retrieval-config qwen_embeddings --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-tasks 5
@@ -65,7 +58,7 @@ Results go to `data/simulations/`. Use `tau2 view` to browse them.
 
 ```
 src/tau2/
-├── agent/           # Agent implementations (half-duplex and full-duplex)
+├── agent/           # Agent implementations (half-duplex)
 ├── api_service/     # FastAPI-based API service
 ├── config.py        # Central configuration (single source of truth for defaults)
 ├── cli.py           # CLI entry point (tau2 command)
@@ -76,14 +69,12 @@ src/tau2/
 ├── gym/             # Gymnasium-compatible RL interface
 ├── knowledge/       # Knowledge retrieval pipeline (embedders, retrievers, postprocessors, sandbox)
 ├── metrics/         # Metrics computation
-├── orchestrator/    # Simulation orchestrators (half-duplex, full-duplex)
+├── orchestrator/    # Simulation orchestrator (half-duplex)
 ├── registry.py      # Global registry for agents, domains, tasks, users
 ├── runner/          # Simulation runner (batch execution, checkpointing, build helpers)
 ├── scripts/         # CLI command implementations
 ├── user/            # User simulator implementations
-├── utils/           # Shared utilities
-└── voice/           # Voice synthesis, transcription, audio-native providers
-    └── audio_native/  # Real-time voice providers (openai, gemini, nova, xai, deepgram, qwen, livekit)
+└── utils/           # Shared utilities
 ```
 
 Other top-level directories:
@@ -107,14 +98,13 @@ registry.register_tasks(get_tasks, "my_domain", get_task_splits=get_tasks_split)
 
 ### Agent Architecture
 
-Two base classes, determined by communication mode:
+One base class for turn-based agents:
 
 | Mode | Base class | Key method | Used by |
 |------|-----------|------------|---------|
 | Half-duplex (turn-based) | `HalfDuplexAgent` | `generate_next_message()` | `LLMAgent` |
-| Full-duplex (streaming) | `FullDuplexAgent` | `get_next_chunk()` | `DiscreteTimeAudioNativeAgent` |
 
-Both share the constructor signature: `__init__(self, tools: list[Tool], domain_policy: str)`.
+It uses the constructor signature: `__init__(self, tools: list[Tool], domain_policy: str)`.
 For LLM-based agents, mix in `LLMConfigMixin` to add `llm` and `llm_args` parameters.
 
 ### Domain Structure
@@ -130,10 +120,9 @@ Domain data lives in `data/tau2/domains/<name>/` (tasks.json, policy.md, db.json
 
 **Note:** The `banking_knowledge` domain extends the standard pattern with additional files (`retrieval.py`, `retrieval_mixins.py`, `retrieval_toolkits.py`, `db_query.py`), dynamic tools and policy that vary by `--retrieval-config`, and a separate `knowledge/` retrieval pipeline module. Its data directory also includes `documents/`, `prompts/`, and `tasks/` subdirectories. See `src/tau2/knowledge/README.md` for details.
 
-### Orchestrators
+### Orchestrator
 
 - `Orchestrator` — half-duplex, turn-based, synchronous tool execution
-- `FullDuplexOrchestrator` — full-duplex, tick-based, simultaneous agent/user activity
 
 ## Testing
 
@@ -142,9 +131,6 @@ Tests are split into tiers matching the optional dependency groups. Each tier ha
 ```bash
 # Core tests — works with just `uv sync --extra dev`
 make test
-
-# Voice + streaming tests — requires `uv sync --extra voice --extra dev`
-make test-voice
 
 # Banking knowledge tests — requires `uv sync --extra knowledge --extra dev`
 make test-knowledge
@@ -160,15 +146,10 @@ pytest tests/test_domains/test_<domain_name>
 
 # Specific test file
 pytest tests/test_agent.py
-
-# Skip full-duplex integration tests (require live APIs)
-pytest -m "not full_duplex_integration"
 ```
 
 Test layout mirrors source:
 - `tests/test_domains/` — per-domain tool and user-tool tests (except `test_banking_knowledge/` which requires the `knowledge` extra)
-- `tests/test_streaming/` — streaming/full-duplex tests (requires `voice` extra)
-- `tests/test_voice/` — audio-native provider tests (requires `voice` extra; individual providers gated by `{PROVIDER}_TEST_ENABLED=1`)
 - `tests/test_gym/` — gymnasium RL interface tests (requires `gym` extra)
 
 ## Code Style
@@ -198,7 +179,6 @@ test: add integration tests for retail domain
 - **`data/` directory**: Contains domain data that the framework depends on. Be careful modifying JSON/TOML data files.
 - **`config.py`**: Single source of truth for default configuration values. Import constants from here rather than defining local duplicates.
 - **`registry.py`**: All new agents, domains, and user simulators must be registered here to be usable via CLI.
-- **Audio native providers**: Each has its own WebSocket protocol and event format. Always verify against provider documentation. See `.cursor/rules/audio-native-provider.md` for the full implementation guide.
 - **Task splits**: The `base` split is the default for evaluation. The `train`/`test` splits are for RL experiments.
 - **Pre-commit hook**: Runs `make check-all` (ruff lint + format). Fix any issues before committing.
 - **Notebooks**: Excluded from ruff (`*.ipynb` in pyproject.toml exclude).

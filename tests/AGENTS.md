@@ -17,24 +17,19 @@ tests/
 │       ├── tasks/              # Per-task scenario tests (test_task_*.py)
 │       ├── test_retrieval_system.py  # Retrieval pipeline tests
 │       └── test_tools_knowledge.py   # Domain tool tests
-├── test_streaming/             # Full-duplex / streaming tests
-├── test_gym/                   # Gymnasium interface tests
-└── test_voice/                 # Voice + audio native provider tests
-    └── test_audio_native/
-        └── test_<provider>/
+├── test_runner/                # Batch runner / controller / work-queue tests
+└── test_gym/                   # Gymnasium interface tests
 ```
 
 ## Running Tests
 
 ```bash
 make test                         # Core tests (no optional deps needed)
-make test-voice                   # Voice + streaming tests
 make test-knowledge               # Banking knowledge tests
 make test-gym                     # Gymnasium tests
 make test-all                     # All tests
 pytest tests/test_domains/test_airline/   # Domain-specific
 pytest tests/test_agent.py        # Single file
-pytest -m "not full_duplex_integration"   # Skip live API tests
 ```
 
 ### Test Tiers
@@ -44,7 +39,6 @@ Tests are organized into tiers that match the project's optional dependency grou
 | Tier | Directories | Required install |
 |------|-------------|-----------------|
 | Core (`make test`) | `test_agent.py`, `test_environment.py`, `test_orchestrator.py`, `test_run.py`, `test_tasks.py`, `test_user.py`, `test_utils.py`, `test_llm_utils.py`, `test_checkpoint.py`, `test_results_format.py`, `test_domains/test_airline/`, `test_domains/test_mock/`, `test_domains/test_retail/`, `test_domains/test_telecom/` | `uv sync --extra dev` |
-| Voice (`make test-voice`) | `test_voice/`, `test_streaming/` | `uv sync --extra voice --extra dev` |
 | Knowledge (`make test-knowledge`) | `test_domains/test_banking_knowledge/` | `uv sync --extra knowledge --extra dev` |
 | Gym (`make test-gym`) | `test_gym/` | `uv sync --extra gym --extra dev` |
 | All (`make test-all`) | Everything above | `uv sync --all-extras` |
@@ -62,19 +56,6 @@ Shared fixtures are in `conftest.py` and default to the `mock` domain:
 - `task_with_*` — various task fixtures for different evaluation scenarios
 
 Use the `mock` domain for unit tests. It's fast, has no external dependencies, and covers all evaluation criteria types.
-
-### Test Markers
-
-- `@pytest.mark.full_duplex_integration` — requires live LLM APIs; skipped by default in CI
-- `@pytest.mark.skipif(not os.environ.get("{PROVIDER}_TEST_ENABLED"))` — audio native provider tests require `{PROVIDER}_TEST_ENABLED=1`
-
-### Provider Test Pattern
-
-Audio native provider tests in `tests/test_voice/test_audio_native/test_<provider>/`:
-- Gated by environment variable: `{PROVIDER}_TEST_ENABLED=1`
-- Use shared test audio from `tests/test_voice/test_audio_native/testdata/`
-- Required test classes: `TestProviderConnection`, `TestProviderConfiguration`, `TestProviderAudioSend`, `TestProviderAudioReceive`, `TestProviderTranscription`, `TestProviderToolFlow`
-- Run: `{PROVIDER}_TEST_ENABLED=1 pytest tests/test_voice/test_audio_native/test_<provider>/ -v`
 
 ### Domain Test Pattern
 
@@ -101,5 +82,4 @@ Retrieval e2e tests use skip markers to gate tests that require external depende
 ### What NOT to Do
 
 - Do not add tests that require live API keys to the default test suite — gate them with markers or environment variables.
-- Do not modify shared test audio files in `testdata/` without regenerating via `generate_test_audio.py`.
 - Do not use `mock` domain tasks for testing domain-specific behavior — use the actual domain's fixtures.

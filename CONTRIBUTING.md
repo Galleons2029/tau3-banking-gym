@@ -115,7 +115,6 @@ uv run tau2 check-data
 Install additional extras as needed for the area you're working on:
 
 ```bash
-uv sync --extra voice          # voice/audio-native features
 uv sync --extra knowledge      # banking_knowledge domain (retrieval pipeline)
 uv sync --extra gym            # gymnasium RL interface
 uv sync --extra experiments    # plotting libs for src/experiments/
@@ -142,7 +141,6 @@ Tests are split into tiers matching the optional dependency groups:
 
 ```bash
 make test              # Core tests (requires: uv sync --extra dev)
-make test-voice        # Voice + streaming tests (requires: uv sync --extra dev --extra voice)
 make test-knowledge    # Banking knowledge tests (requires: uv sync --extra dev --extra knowledge)
 make test-gym          # Gymnasium tests (requires: uv sync --extra dev --extra gym)
 make test-all          # All tests (requires: uv sync --all-extras)
@@ -153,7 +151,7 @@ pytest tests/test_agent.py  # Agent tests
 pytest tests/test_environment.py  # Environment tests
 ```
 
-`make test` is the safe default -- it works with just `uv sync --extra dev` and does not require voice, knowledge, or gym packages.
+`make test` is the safe default -- it works with just `uv sync --extra dev` and does not require knowledge or gym packages.
 
 ### Test Requirements for PRs
 - **Existing tests must pass**: All current tests should continue to pass
@@ -209,7 +207,7 @@ wip
 ## 🔍 Pull Request Guidelines
 
 ### Before Opening a PR
-- [ ] Core tests pass locally (`make test`); run `make test-voice`, `make test-knowledge`, or `make test-gym` if your changes touch those areas
+- [ ] Core tests pass locally (`make test`); run `make test-knowledge` or `make test-gym` if your changes touch those areas
 - [ ] Code follows style guidelines (`make check-all` passes)
 - [ ] New functionality is tested
 - [ ] Documentation is updated if needed
@@ -238,7 +236,7 @@ Brief description of the changes made.
 - Links to relevant docs or issues
 
 ## Checklist
-- [ ] Tests pass (`make test`; also run relevant tier targets if changes touch voice/knowledge/gym)
+- [ ] Tests pass (`make test`; also run relevant tier targets if changes touch knowledge/gym)
 - [ ] Code follows style guidelines (`make check-all`)
 - [ ] Documentation updated
 - [ ] Breaking changes noted
@@ -277,7 +275,7 @@ There are two types of agent contributions:
 #### Core Agents (`src/tau2/agent/`)
 Core agents are part of the official tau2 framework and are maintained by Sierra. Core agent contributions:
 - Require thorough review and approval
-- Must implement `HalfDuplexAgent` or `FullDuplexAgent`
+- Must implement `HalfDuplexAgent`
 - Are registered in `src/tau2/registry.py`
 - See `src/tau2/agent/README.md` for the full developer guide
 

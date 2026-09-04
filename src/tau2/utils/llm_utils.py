@@ -486,8 +486,8 @@ def get_cost(messages: list[Message]) -> tuple[float | None, float | None]:
     Get the (agent_cost, user_cost) of the interaction.
 
     Each side is computed independently: a side is None if any of its
-    messages has no cost. This way an uncosted agent message (e.g. an
-    audio-native provider without usage reporting) doesn't discard the
+    messages has no cost. This way an uncosted agent message (e.g. a
+    provider without usage reporting) doesn't discard the
     user side's cost, and vice versa.
     """
     agent_cost: float | None = 0.0

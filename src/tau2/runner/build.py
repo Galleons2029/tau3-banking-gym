@@ -7,31 +7,19 @@ this layer and construct instances directly.
 """
 
 import uuid
-from copy import deepcopy
-from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 from loguru import logger
 
-from tau2.agent.base_agent import FullDuplexAgent, HalfDuplexAgent
+from tau2.agent.base_agent import HalfDuplexAgent
 from tau2.data_model.persona import PersonaConfig
-from tau2.data_model.simulation import (
-    AudioNativeConfig,
-    RunConfig,
-    TextRunConfig,
-    VoiceRunConfig,
-)
+from tau2.data_model.simulation import RunConfig, TextRunConfig
 from tau2.data_model.tasks import Task
-from tau2.data_model.voice import SpeechComplexity, SynthesisConfig, VoiceSettings
 from tau2.environment.environment import Environment
-from tau2.orchestrator.full_duplex_orchestrator import FullDuplexOrchestrator
 from tau2.orchestrator.orchestrator import Orchestrator
 from tau2.registry import registry
 from tau2.user.user_simulator import DummyUser, UserSimulator
-from tau2.user.user_simulator_base import FullDuplexUser, HalfDuplexUser
-from tau2.user_simulation_voice_presets import (
-    get_or_load_task_voice_config,
-)
+from tau2.user.user_simulator_base import HalfDuplexUser
 
 # =============================================================================
 # Low-level build functions (no RunConfig needed)
@@ -72,10 +60,8 @@ def build_agent(
     llm: Optional[str] = None,
     llm_args: Optional[dict] = None,
     task: Optional[Task] = None,
-    audio_native_config: Optional[AudioNativeConfig] = None,
     solo_mode: bool = False,
-    audio_taps_dir: Optional[Path] = None,
-) -> Union[HalfDuplexAgent, FullDuplexAgent]:
+) -> HalfDuplexAgent:
     """Build an agent from a registered name and an environment.
 
     Uses the registry to resolve the agent name to a factory function,
@@ -83,12 +69,11 @@ def build_agent(
 
     Args:
         agent_name: Registered agent name (e.g., "llm_agent", "llm_agent_gt",
-            "discrete_time_audio_native_agent", or "experimental:my_agent").
+            or "experimental:my_agent").
         environment: The environment to extract tools and policy from.
-        llm: LLM model name for the agent (half-duplex agents).
-        llm_args: LLM arguments for the agent (half-duplex agents).
+        llm: LLM model name for the agent.
+        llm_args: LLM arguments for the agent.
         task: The task (required for some agents like llm_agent_gt, llm_agent_solo).
-        audio_native_config: Audio config (full-duplex agents).
         solo_mode: If True, agent tools include both agent and user tools.
 
     Returns:
@@ -120,8 +105,6 @@ def build_agent(
         llm=llm,
         llm_args=llm_args,
         task=task,
-        audio_native_config=audio_native_config,
-        audio_taps_dir=audio_taps_dir,
     )
 
 
@@ -175,131 +158,6 @@ def build_user(
         user_kwargs["persona_config"] = persona_config
 
     return UserConstructor(**user_kwargs)
-
-
-def build_voice_user(
-    environment: Environment,
-    task: Task,
-    audio_native_config: AudioNativeConfig,
-    *,
-    llm: Optional[str] = None,
-    llm_args: Optional[dict] = None,
-    voice_settings: Optional[VoiceSettings] = None,
-    persona_config: Optional[PersonaConfig] = None,
-    speech_complexity: SpeechComplexity = "regular",
-    seed: int = 42,
-    domain: Optional[str] = None,
-    hallucination_feedback: Optional[str] = None,
-    audio_taps_dir: Optional[Path] = None,
-) -> FullDuplexUser:
-    """Build a full-duplex voice user simulator.
-
-    Handles all voice configuration wiring: sampling voice configs per task,
-    merging effect configs, creating speech environment, and constructing the
-    VoiceStreamingUserSimulator with all timing parameters from audio_native_config.
-
-    Args:
-        environment: The environment to extract user tools from.
-        task: The task (used for user instructions and voice config sampling).
-        audio_native_config: Full audio-native configuration (timing, thresholds, etc.).
-        llm: LLM model name for the user simulator.
-        llm_args: LLM arguments for the user simulator.
-        voice_settings: Base voice settings. If None, defaults are created.
-            Deep copied internally to avoid mutation.
-        persona_config: Persona configuration. If None, derived from sampled voice config.
-        speech_complexity: Speech environment complexity level.
-        seed: Base seed for voice config sampling. Per-task seed is derived as
-            seed + hash(task.id) % 1000000.
-        domain: Domain name (used for loading pre-sampled voice configs).
-            If None, extracted from environment.
-        hallucination_feedback: Optional feedback from a previous hallucination
-            check. If provided, appended to user instructions to help avoid
-            repeating the same errors on retry.
-
-    Returns:
-        A fully constructed VoiceStreamingUserSimulator.
-    """
-    if domain is None:
-        domain = environment.get_domain_name()
-
-    try:
-        user_tools = environment.get_user_tools(include=task.user_tools) or None
-    except Exception:
-        user_tools = None
-
-    # Set up voice settings (deep copy to avoid mutating caller's settings)
-    if voice_settings is not None:
-        task_voice_settings = deepcopy(voice_settings)
-    else:
-        task_voice_settings = VoiceSettings(
-            transcription_config=None,
-            synthesis_config=SynthesisConfig(),
-        )
-
-    # Get voice config for this task (from pre-sampled file or sample on the fly)
-    task_seed = seed + hash(task.id) % 1000000
-    sampled_voice_config = get_or_load_task_voice_config(
-        domain=domain,
-        task_id=task.id,
-        task_seed=task_seed,
-        complexity=speech_complexity,
-        synthesis_config=task_voice_settings.synthesis_config,
-    )
-
-    # Update synthesis_config with merged effect configs
-    task_voice_settings.synthesis_config.channel_effects_config = (
-        sampled_voice_config.channel_effects_config
-    )
-    task_voice_settings.synthesis_config.source_effects_config = (
-        sampled_voice_config.source_effects_config
-    )
-    task_voice_settings.synthesis_config.speech_effects_config = (
-        sampled_voice_config.speech_effects_config
-    )
-
-    # Set speech environment
-    speech_environment = sampled_voice_config.to_speech_environment(task_seed)
-    task_voice_settings.speech_environment = speech_environment
-
-    # Use provided persona config or fall back to sampled config
-    if persona_config is None:
-        persona_config = sampled_voice_config.persona_config
-
-    user_instructions = str(task.user_scenario)
-    if hallucination_feedback:
-        user_instructions += f"\n\n{hallucination_feedback}"
-
-    from tau2.user.user_simulator_streaming import VoiceStreamingUserSimulator
-
-    return VoiceStreamingUserSimulator(
-        tools=user_tools,
-        instructions=user_instructions,
-        llm=llm,
-        llm_args=llm_args,
-        voice_settings=task_voice_settings,
-        chunk_size=audio_native_config.user_chunk_size,
-        wait_to_respond_threshold_other=audio_native_config.wait_to_respond_threshold_other_ticks,
-        wait_to_respond_threshold_self=audio_native_config.wait_to_respond_threshold_self_ticks,
-        yield_threshold_when_interrupted=audio_native_config.yield_threshold_when_interrupted_ticks,
-        yield_threshold_when_interrupting=audio_native_config.yield_threshold_when_interrupting_ticks,
-        backchannel_min_threshold=(
-            int(
-                sampled_voice_config.backchannel_min_threshold
-                / audio_native_config.tick_duration_seconds
-            )
-            if sampled_voice_config.backchannel_min_threshold is not None
-            else None
-        ),
-        backchannel_max_threshold=audio_native_config.backchannel_max_threshold_ticks,
-        backchannel_poisson_rate=audio_native_config.backchannel_poisson_rate,
-        use_llm_backchannel=sampled_voice_config.use_llm_backchannel,
-        interruption_check_interval=audio_native_config.interruption_check_interval_ticks,
-        integration_ticks=audio_native_config.integration_ticks,
-        silence_annotation_threshold_ticks=audio_native_config.silence_annotation_threshold_ticks,
-        tick_duration_seconds=audio_native_config.tick_duration_seconds,
-        persona_config=persona_config,
-        audio_taps_dir=audio_taps_dir,
-    )
 
 
 # =============================================================================
@@ -434,154 +292,30 @@ def build_text_orchestrator(
     return orchestrator
 
 
-def build_voice_orchestrator(
-    config: VoiceRunConfig,
-    task: Task,
-    *,
-    seed: Optional[int] = None,
-    simulation_id: Optional[str] = None,
-    user_voice_settings: Optional[VoiceSettings] = None,
-    user_persona_config: Optional[PersonaConfig] = None,
-    hallucination_feedback: Optional[str] = None,
-    audio_taps_dir: Optional[Path] = None,
-) -> FullDuplexOrchestrator:
-    """Build a full-duplex (voice) orchestrator from a VoiceRunConfig.
-
-    Args:
-        config: Voice run configuration.
-        task: The task to run.
-        seed: Per-trial seed. If None, uses config.seed.
-        simulation_id: Unique simulation ID. If None, a UUID is generated.
-        user_voice_settings: Pre-computed voice settings (from run-level setup).
-            If None, defaults are created.
-        user_persona_config: Pre-computed persona config (from run-level setup).
-            If None, derived from sampled voice config.
-        hallucination_feedback: Optional feedback from a previous hallucination
-            check. If provided, appended to user instructions to help avoid
-            repeating the same errors on retry.
-
-    Returns:
-        A fully constructed FullDuplexOrchestrator, ready for run_simulation().
-
-    Raises:
-        ValueError: If the agent is registered with solo_mode=True, which is
-            not supported for voice/full-duplex runs.
-
-    Example:
-        config = VoiceRunConfig(domain="airline", audio_native_config=AudioNativeConfig())
-        tasks = get_tasks("airline")
-        orchestrator = build_voice_orchestrator(config, tasks[0], seed=42)
-        result = run_simulation(orchestrator)
-    """
-    if simulation_id is None:
-        simulation_id = str(uuid.uuid4())
-    if seed is None:
-        seed = config.seed
-
-    # Solo mode is not supported for voice/full-duplex runs
-    solo_mode = registry.get_agent_metadata(
-        config.effective_agent, "solo_mode", default=False
-    )
-    if solo_mode:
-        raise ValueError(
-            f"Agent '{config.effective_agent}' is registered with solo_mode=True, "
-            f"but solo mode is not supported for voice/full-duplex runs."
-        )
-
-    domain = config.domain
-    env_kwargs = _build_env_kwargs(config, task)
-
-    environment = build_environment(domain, env_kwargs=env_kwargs)
-
-    agent = build_agent(
-        config.effective_agent,
-        environment,
-        audio_native_config=config.audio_native_config,
-        audio_taps_dir=audio_taps_dir,
-    )
-
-    user = build_voice_user(
-        environment,
-        task,
-        config.audio_native_config,
-        llm=config.llm_user,
-        llm_args=config.llm_args_user,
-        voice_settings=user_voice_settings,
-        persona_config=user_persona_config,
-        speech_complexity=config.speech_complexity,
-        seed=seed or 42,
-        domain=domain,
-        hallucination_feedback=hallucination_feedback,
-        audio_taps_dir=audio_taps_dir,
-    )
-
-    orchestrator = FullDuplexOrchestrator(
-        domain=domain,
-        agent=agent,
-        user=user,
-        environment=environment,
-        task=task,
-        max_steps=config.effective_max_steps,
-        max_errors=config.max_errors,
-        seed=seed,
-        simulation_id=simulation_id,
-        tick_duration_seconds=config.audio_native_config.tick_duration_seconds,
-        timeout=config.timeout,
-    )
-
-    logger.debug(
-        f"Built voice orchestrator: domain={domain}, agent={config.effective_agent}, "
-        f"user={config.effective_user}, task={task.id}"
-    )
-
-    return orchestrator
-
-
 def build_orchestrator(
     config: RunConfig,
     task: Task,
     *,
     seed: Optional[int] = None,
     simulation_id: Optional[str] = None,
-    user_voice_settings: Optional[VoiceSettings] = None,
     user_persona_config: Optional[PersonaConfig] = None,
-    hallucination_feedback: Optional[str] = None,
-    audio_taps_dir: Optional[Path] = None,
-) -> Union[Orchestrator, FullDuplexOrchestrator]:
+) -> Orchestrator:
     """Build a ready-to-run orchestrator from a RunConfig and task.
 
-    Dispatches to build_text_orchestrator or build_voice_orchestrator
-    based on the config type.
-
     Args:
-        config: Text or voice run configuration.
+        config: Run configuration.
         task: The task to run.
         seed: Per-trial seed. If None, uses config.seed.
         simulation_id: Unique simulation ID. If None, a UUID is generated.
-        user_voice_settings: Pre-computed voice settings (voice mode only).
         user_persona_config: Pre-computed persona config.
-        hallucination_feedback: Optional feedback from a previous hallucination
-            check (voice mode only). Passed through to build_voice_orchestrator.
 
     Returns:
-        A fully constructed Orchestrator or FullDuplexOrchestrator.
+        A fully constructed Orchestrator.
     """
-    if isinstance(config, VoiceRunConfig):
-        return build_voice_orchestrator(
-            config,
-            task,
-            seed=seed,
-            simulation_id=simulation_id,
-            user_voice_settings=user_voice_settings,
-            user_persona_config=user_persona_config,
-            hallucination_feedback=hallucination_feedback,
-            audio_taps_dir=audio_taps_dir,
-        )
-    else:
-        return build_text_orchestrator(
-            config,
-            task,
-            seed=seed,
-            simulation_id=simulation_id,
-            user_persona_config=user_persona_config,
-        )
+    return build_text_orchestrator(
+        config,
+        task,
+        seed=seed,
+        simulation_id=simulation_id,
+        user_persona_config=user_persona_config,
+    )

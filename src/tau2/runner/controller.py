@@ -31,7 +31,6 @@ from tau2.data_model.simulation import (
     RunConfig,
     SimulationRun,
     TerminationReason,
-    VoiceRunConfig,
 )
 from tau2.data_model.tasks import Task
 from tau2.evaluator.evaluator import EvaluationType
@@ -127,9 +126,6 @@ class ControllerRun:
         task, and where artifacts go. Workers share the filesystem locally;
         cross-machine artifact upload is a later addition."""
         return {
-            "config_kind": "voice"
-            if isinstance(self.config, VoiceRunConfig)
-            else "text",
             "config": self.config.model_dump(mode="json"),
             "task": self.tasks_by_id[unit.task_id].model_dump(mode="json"),
             "evaluation_type": self.evaluation_type.value,

@@ -59,7 +59,7 @@ def expand_paths(paths: list[str], extension: str | None = None) -> list[str]:
             files.append(str(path_obj))
         elif path_obj.is_dir():
             # If the directory itself contains a results.json, treat it as a
-            # single simulation result directory (text or voice).
+            # single simulation result directory.
             results_file = path_obj / "results.json"
             if extension == ".json" and results_file.exists():
                 files.append(str(results_file))

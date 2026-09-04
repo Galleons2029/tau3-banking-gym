@@ -14,9 +14,9 @@
 
 <div align="center">
 <h3>🚀 τ³-bench is here!</h3>
-<p>From text-only to multimodal, knowledge-aware agent evaluation.<br>
-Voice full-duplex · Knowledge retrieval · 75+ task fixes<br>
-<a href="https://arxiv.org/abs/2603.13686">τ-Voice paper</a> · <a href="https://arxiv.org/abs/2603.04370">τ-Knowledge paper</a> · <a href="https://arxiv.org/abs/2512.07850">Task fixes paper</a> · <a href="https://github.com/sierra-research/tau2-bench/releases/tag/v1.0.0">Release notes</a></p>
+<p>Knowledge-aware agent evaluation.<br>
+Knowledge retrieval · 75+ task fixes<br>
+<a href="https://arxiv.org/abs/2603.04370">τ-Knowledge paper</a> · <a href="https://arxiv.org/abs/2512.07850">Task fixes paper</a> · <a href="https://github.com/sierra-research/tau2-bench/releases/tag/v1.0.0">Release notes</a></p>
 </div>
 
 > **How do you say $\tau^3$-bench?** We just say "tau three," but you do you!
@@ -26,9 +26,8 @@ Voice full-duplex · Knowledge retrieval · 75+ task fixes<br>
 > **📢 July 2026 — v1.0.1 grading update:** This release fixes a couple of `banking_knowledge` task errors. Scores on that domain change as a result — **results produced with tau2-bench < 1.0.1 are not comparable with >= 1.0.1**, and affected leaderboard submissions have been re-graded. Old results files can be re-scored with `tau2 evaluate-trajs --fresh-tasks`; to reproduce pre-fix behavior, pin the [`pre-v1.0.1`](https://github.com/sierra-research/tau2-bench/releases/tag/pre-v1.0.1) tag. Details in the [changelog](CHANGELOG.md) and [release notes](RELEASE_NOTES.md). Other domains are unaffected.
 
 - **Knowledge Domain (`banking_knowledge`)** — A knowledge-retrieval-based customer service domain with configurable RAG pipelines, document search, embeddings, and agentic shell-based search. [Learn more →](src/tau2/knowledge/README.md)
-- **Voice Full-Duplex (Audio Native)** — End-to-end voice evaluation with realtime providers (OpenAI, Gemini, xAI). [Learn more →](src/tau2/voice/README.md)
 - **Task Quality (75+ fixes)** — Removed incorrect expected actions, clarified ambiguous instructions, fixed impossible constraints, and added missing fallback behaviors across airline, retail, and banking domains. Based on analysis from [SABER](https://arxiv.org/abs/2512.07850) (Cuadron et al., 2025). [Learn more →](https://taubench.com/blog/tau3-task-fixes.html)
-- **Updated Leaderboard** — Now includes voice and knowledge results. Compare model performance at [taubench.com](https://taubench.com). [Submit your results →](docs/leaderboard-submission.md)
+- **Updated Leaderboard** — Now includes knowledge results. Compare model performance at [taubench.com](https://taubench.com). [Submit your results →](docs/leaderboard-submission.md)
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
@@ -38,7 +37,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ## Overview
 
-$\tau$-bench is a simulation framework for evaluating customer service agents across multiple domains. It supports text-based half-duplex (turn-based) evaluation and voice full-duplex (simultaneous) evaluation using real-time audio APIs.
+$\tau$-bench is a simulation framework for evaluating customer service agents across multiple domains. It runs text-based half-duplex (turn-based) evaluation.
 
 Each domain specifies:
 - A **policy** that the agent must follow
@@ -47,11 +46,6 @@ Each domain specifies:
 - Optionally: a set of **user tools** for the user simulator
 
 **Available domains**: `mock` · `airline` · `retail` · `telecom` · `banking_knowledge`
-
-| Mode | Description |
-|------|-------------|
-| **Text (half-duplex)** | Turn-based chat with tool use |
-| **Voice (full-duplex)** | End-to-end audio via realtime providers (OpenAI, Gemini, xAI) |
 
 ## Quick Start
 
@@ -66,14 +60,13 @@ uv sync                        # core only (text-mode: airline, retail, telecom,
 Optional extras (install what you need):
 
 ```bash
-uv sync --extra voice          # + voice/audio-native features
 uv sync --extra knowledge      # + banking_knowledge domain (retrieval pipeline)
 uv sync --extra gym            # + gymnasium RL interface
 uv sync --extra dev            # + pytest, ruff, pre-commit (required for contributing)
 uv sync --all-extras           # everything
 ```
 
-This requires [uv](https://docs.astral.sh/uv/getting-started/installation/). Voice features also need system dependencies (`brew install portaudio ffmpeg` on macOS). See the [full installation guide](docs/getting-started.md) for details.
+This requires [uv](https://docs.astral.sh/uv/getting-started/installation/). See the [full installation guide](docs/getting-started.md) for details.
 
 ### 2. Set up API keys
 
@@ -108,7 +101,7 @@ Results are saved to `data/simulations/`. Use `tau2 view` to browse them.
 |----------|-------------|
 | [Agent Developer Guide](src/tau2/agent/README.md) | Build and evaluate your own agent |
 | [Domains](src/tau2/domains/README.md) | Domain structure, data format, and available domains |
-| [Orchestrator & Communication Modes](src/tau2/orchestrator/README.md) | Half-duplex and full-duplex orchestration |
+| [Orchestrator](src/tau2/orchestrator/README.md) | Half-duplex (turn-based) orchestration |
 | [Task Schema & Evaluation](docs/evaluation.md) | What `evaluation_criteria.actions` means, how `reward_basis` gates the reward, and how to inspect action correctness |
 
 ### Knowledge Retrieval
@@ -116,13 +109,6 @@ Results are saved to `data/simulations/`. Use `tau2 view` to browse them.
 | Document | Description |
 |----------|-------------|
 | [Knowledge Retrieval](src/tau2/knowledge/README.md) | Retrieval pipeline configs, embeddings, RAG, and sandbox setup for the `banking_knowledge` domain |
-
-### Voice & Audio
-
-| Document | Description |
-|----------|-------------|
-| [Voice (Full-Duplex)](src/tau2/voice/README.md) | Providers, speech complexity, CLI options, and output structure for voice evaluation |
-| [Audio Native Architecture](src/tau2/voice/audio_native/README.md) | Internal architecture for adding or modifying realtime provider adapters |
 
 ### RL & Training
 
@@ -160,21 +146,6 @@ If you use a specific component of $\tau^3$-bench, please cite the corresponding
   author={Shi, Quan and Zytek, Alexandra and Razavi, Pedram and Narasimhan, Karthik and Barres, Victor},
   journal={arXiv preprint arXiv:2603.04370},
   year={2026}
-}
-```
-
-### Voice Full-Duplex Benchmark
-
-```bibtex
-
-@misc{ray2026tauvoicebenchmarkingfullduplexvoice,
-      title={$\tau$-Voice: Benchmarking Full-Duplex Voice Agents on Real-World Domains},
-      author={Soham Ray and Keshav Dhandhania and Victor Barres and Karthik Narasimhan},
-      year={2026},
-      eprint={2603.13686},
-      archivePrefix={arXiv},
-      primaryClass={cs.SD},
-      url={https://arxiv.org/abs/2603.13686},
 }
 ```
 

@@ -4,7 +4,7 @@ Checkpoint save/resume logic for batch simulation runs.
 Supports two storage formats:
 - "json": single monolithic results.json (default for text runs).
 - "dir": metadata in results.json + individual simulation files in
-  simulations/ (default for voice runs — O(1) append, O(1) replace).
+  simulations/ (O(1) append, O(1) replace).
 
 Format is auto-detected from on-disk state. New runs use the format specified
 by the ``results_format`` parameter (default "json" for backward compat).

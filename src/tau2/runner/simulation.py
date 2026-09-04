@@ -5,19 +5,17 @@ Runs a pre-built orchestrator and evaluates the result.
 No registry dependency, no config parsing, no side effects.
 """
 
-from typing import Optional, Union
+from typing import Optional
 
 from loguru import logger
 
 from tau2.data_model.simulation import SimulationRun
 from tau2.evaluator.evaluator import EvaluationType, evaluate_simulation
-from tau2.orchestrator.full_duplex_orchestrator import FullDuplexOrchestrator
-from tau2.orchestrator.modes import CommunicationMode
 from tau2.orchestrator.orchestrator import Orchestrator
 
 
 def run_simulation(
-    orchestrator: Union[Orchestrator, FullDuplexOrchestrator],
+    orchestrator: Orchestrator,
     *,
     evaluation_type: EvaluationType = EvaluationType.ALL,
     env_kwargs: Optional[dict] = None,
@@ -32,8 +30,7 @@ def run_simulation(
     or RunConfig -- everything is already encapsulated in the orchestrator.
 
     Args:
-        orchestrator: A fully constructed Orchestrator (half-duplex) or
-            FullDuplexOrchestrator (full-duplex/voice). Must have agent, user,
+        orchestrator: A fully constructed Orchestrator. Must have agent, user,
             environment, and task set.
         evaluation_type: The type of evaluation to perform. Defaults to ALL.
         env_kwargs: Additional kwargs passed to the evaluator's environment
@@ -64,12 +61,6 @@ def run_simulation(
     # Extract context from the orchestrator -- no external params needed
     domain = orchestrator.environment.get_domain_name()
     task = orchestrator.task
-    is_full_duplex = isinstance(orchestrator, FullDuplexOrchestrator)
-    mode = (
-        CommunicationMode.FULL_DUPLEX
-        if is_full_duplex
-        else CommunicationMode.HALF_DUPLEX
-    )
     solo_mode = getattr(orchestrator, "solo_mode", False)
 
     # Evaluate
@@ -79,7 +70,6 @@ def run_simulation(
         evaluation_type=evaluation_type,
         solo_mode=solo_mode,
         domain=domain,
-        mode=mode,
         env_kwargs=env_kwargs,
     )
     simulation.reward_info = reward_info

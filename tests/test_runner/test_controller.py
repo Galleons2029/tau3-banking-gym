@@ -97,7 +97,6 @@ class TestControllerHttpContract:
             unit = body["unit"]
             assert unit["run_id"] == "test_run"
             run = body["run"]
-            assert run["config_kind"] == "text"
             assert run["config"]["domain"] == "mock"
             assert run["task"]["id"] == unit["task_id"]
             # The CLI's --llm-log-mode only reaches worker processes through

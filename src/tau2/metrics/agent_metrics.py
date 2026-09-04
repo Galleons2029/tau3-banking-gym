@@ -51,7 +51,7 @@ class AgentMetrics(BaseModel):
     termination_error: int = 0
     termination_infrastructure_error: int = 0
 
-    # Responsiveness metrics (from full-duplex/streaming mode)
+    # Responsiveness metrics
     sims_with_unresponsive_period: int = 0
     sims_with_responsiveness_info: int = 0
 
@@ -271,7 +271,7 @@ def compute_metrics(results: Results) -> AgentMetrics:
     termination_max_steps = 0
     termination_error = 0
 
-    # Responsiveness (from full-duplex/streaming mode)
+    # Responsiveness
     sims_with_unresponsive_period = 0
     sims_with_responsiveness_info = 0
 
@@ -334,7 +334,7 @@ def compute_metrics(results: Results) -> AgentMetrics:
         ):
             termination_error += 1
 
-        # Responsiveness info (from full-duplex/streaming mode)
+        # Responsiveness info
         if sim.info and "had_unresponsive_period" in sim.info:
             sims_with_responsiveness_info += 1
             if sim.info["had_unresponsive_period"]:
@@ -386,9 +386,7 @@ def compute_metrics(results: Results) -> AgentMetrics:
 
             # Find first critical error source
             def get_error_position(e):
-                """Get position for sorting: tick_start for full-duplex, turn_idx for turn-based."""
-                if e.tick_start is not None:
-                    return e.tick_start
+                """Get position for sorting by turn index."""
                 if e.turn_idx is not None:
                     return e.turn_idx
                 return float("inf")

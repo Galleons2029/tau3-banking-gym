@@ -2,6 +2,12 @@
 
 Status: draft design (2026-08-04)
 
+> **Historical record.** Written when this repo still carried the voice
+> (full-duplex) and multilingual runners. Voice support has since been removed;
+> references below to tau-voice, `VoiceRunConfig`, audio artifacts and tick
+> pacing describe the design's original context, not the current codebase.
+> The queue/lease mechanics it specifies are still what `tau2/runner` implements.
+
 **Scope**: standard tau (text), tau-voice, and tau-multi (the multilingual
 pool/preset drivers on `soham/tau-multilingual`). Hyper-tau is explicitly
 out of current scope — the seam covers it structurally (see Coverage), and
@@ -262,7 +268,7 @@ never persisted because it is recomputable from the checkpoint.
   `(trial, task_id, seed)`. The producer emits WorkUnits only for cells not
   in `done_runs`. `--auto-resume` keeps its meaning (skip the prompt).
 - **Grid runs resume per run, exactly as `run_multiple.py` does today**
-  (`src/experiments/tau_voice/run_multiple.py`): each (domain × provider ×
+  (historical `run_multiple.py` sweep runner): each (domain × provider ×
   complexity) combo keeps its own results dir under the base dir, and
   re-invoking the driver re-registers every combo — `try_resume` per combo
   skips what is done. A killed grid resumes mid-grid with nothing special.

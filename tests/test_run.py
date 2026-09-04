@@ -374,10 +374,3 @@ def test_run_solo_agent(domain_name: str, base_task: Task):
         llm_args_user={},
     )
     assert simulation_results is not None
-
-
-# =============================================================================
-# Audio-Native / Full-Duplex Run Tests
-# =============================================================================
-# NOTE: Full-duplex run tests have been moved to:
-# tests/test_streaming/test_run_streaming.py

@@ -29,21 +29,11 @@ This creates a virtual environment, installs core dependencies from the lockfile
 Install the extras you need:
 
 ```bash
-uv sync --extra voice          # + voice/audio-native features
 uv sync --extra knowledge      # + banking_knowledge domain (retrieval pipeline)
 uv sync --extra gym            # + gymnasium RL interface
 uv sync --extra dev            # + pytest, ruff, pre-commit (required for contributing)
 uv sync --extra experiments    # + plotting libs for src/experiments/
 uv sync --all-extras           # everything
-```
-
-#### System dependencies (voice only)
-
-If using voice features (`--extra voice`), install:
-
-**macOS:**
-```bash
-brew install portaudio ffmpeg
 ```
 
 > **Note:** If you install without `-e` mode (e.g., `uv pip install .`), you'll need to set the `TAU2_DATA_DIR` environment variable to point to your data directory:
@@ -69,24 +59,6 @@ Copy `.env.example` as `.env` and edit it to include your API keys:
 cp .env.example .env
 ```
 
-### Voice API Keys (for voice-enabled features)
-
-If you're using voice features, add the following to your `.env` file:
-- `ELEVENLABS_API_KEY` — for voice synthesis
-- `DEEPGRAM_API_KEY` — for voice transcription
-
-### Voice Persona Setup (for voice-enabled features)
-
-The voice pipeline uses ElevenLabs voices for the user simulator. The default voice IDs are Sierra-internal and won't work for external users. You need to create your own voices and configure them via environment variables in your `.env` file:
-
-```bash
-TAU2_VOICE_ID_MATT_DELANEY=your_voice_id_here
-TAU2_VOICE_ID_LISA_BRENNER=your_voice_id_here
-# ... (one per persona)
-```
-
-See the [Voice Persona Setup Guide](voice-personas.md) for step-by-step instructions on creating matching voices using ElevenLabs Voice Design.
-
 ## Running Your First Evaluation
 
 ### Standard text-based evaluation (half-duplex)
@@ -97,16 +69,6 @@ tau2 run --domain airline --agent-llm gpt-4.1 --user-llm gpt-4.1 \
 ```
 
 Results are saved in `data/simulations/`.
-
-### Audio native mode (voice full-duplex)
-
-> **Prerequisite:** Voice mode requires custom ElevenLabs voices for the user simulator. You must set these up before running voice evaluations. See the [Voice Persona Setup Guide](voice-personas.md) — the automated script takes care of everything in one command.
-
-```bash
-tau2 run --domain retail --audio-native --num-tasks 1 --verbose-logs
-```
-
-See the [Audio Native Documentation](../src/tau2/voice/audio_native/README.md) for provider configuration and all options.
 
 ### Knowledge retrieval evaluation
 
@@ -122,20 +84,21 @@ See the [Knowledge Retrieval Documentation](../src/tau2/knowledge/README.md) for
 
 ## Simulation Output Structure
 
-Results are stored in one of two formats, chosen automatically based on modality:
+Results are stored in one of two formats:
 
-### Text runs — monolithic JSON
+### Monolithic JSON (default)
 
-Text-based simulations produce a single file containing all data:
+Simulations produce a single file containing all data:
 
 ```
 data/simulations/<run_name>/
 └── results.json             # Metadata, tasks, and all simulation data
 ```
 
-### Voice runs — directory-based format
+### Directory-based format
 
-Voice simulations contain large tick-level data, so they use a directory-based format that splits simulation data into individual files for efficient checkpointing and streaming:
+For large runs, a directory-based format splits simulation data into individual
+files for efficient checkpointing and streaming:
 
 ```
 data/simulations/<run_name>/
@@ -149,12 +112,6 @@ data/simulations/<run_name>/
         └── sim_<uuid>/
             ├── sim_status.json         # Simulation status
             ├── task.log                # Per-task log
-            ├── audio/
-            │   ├── both.wav            # Full conversation audio (stereo)
-            │   ├── assistant_labels.txt # Audacity labels for agent speech
-            │   ├── user_labels.txt     # Audacity labels for user speech
-            │   ├── assistant_tool_calls_labels.txt  # Audacity labels for agent tool calls (when present)
-            │   └── user_tool_calls_labels.txt       # Audacity labels for user tool calls (when present)
             └── llm_debug/
                 └── *.json              # LLM call logs
 ```
@@ -179,7 +136,7 @@ Both formats are fully supported by `Results.load()`, which auto-detects the for
 tau2 view
 ```
 
-This allows you to browse simulation files, view agent performance metrics, inspect individual simulations, and view task details. Works for both standard text and audio native runs.
+This allows you to browse simulation files, view agent performance metrics, inspect individual simulations, and view task details.
 
 ## Configuration
 
@@ -207,9 +164,7 @@ make clean
 - [CLI Reference](cli-reference.md) — all `tau2` commands and options
 - [Agent Developer Guide](../src/tau2/agent/README.md) — build and evaluate your own agent
 - [Domain Documentation](../src/tau2/domains/README.md) — understand the available domains
-- [Communication Modes](../src/tau2/orchestrator/README.md) — half-duplex and full-duplex orchestration
+- [Orchestrator](../src/tau2/orchestrator/README.md) — half-duplex (turn-based) orchestration
 - [Task Schema & Evaluation](evaluation.md) — how a task is scored, what `actions`/`communicate_info`/`reward_basis` actually do
 - [Knowledge Retrieval](../src/tau2/knowledge/README.md) — retrieval pipeline setup and configuration for banking_knowledge domain
-- [Voice (Full-Duplex)](../src/tau2/voice/README.md) — providers, speech complexity, and CLI options for voice evaluation
-- [Voice Persona Setup](voice-personas.md) — create custom ElevenLabs voices for the user simulator
 - [Gym/RL Interface](../src/tau2/gym/README.md) — Gymnasium-compatible environment for RL training

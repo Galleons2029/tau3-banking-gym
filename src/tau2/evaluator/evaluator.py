@@ -4,20 +4,10 @@ from typing import Optional
 from tau2.data_model.simulation import RewardInfo, SimulationRun, TerminationReason
 from tau2.data_model.tasks import RewardType, Task
 from tau2.environment.toolkit import ToolType, get_tool_types
-from tau2.evaluator.evaluator_action import ActionEvaluator, FullDuplexActionEvaluator
-from tau2.evaluator.evaluator_communicate import (
-    CommunicateEvaluator,
-    FullDuplexCommunicateEvaluator,
-)
-from tau2.evaluator.evaluator_env import (
-    EnvironmentEvaluator,
-    FullDuplexEnvironmentEvaluator,
-)
-from tau2.evaluator.evaluator_nl_assertions import (
-    FullDuplexNLAssertionsEvaluator,
-    NLAssertionsEvaluator,
-)
-from tau2.orchestrator.modes import CommunicationMode
+from tau2.evaluator.evaluator_action import ActionEvaluator
+from tau2.evaluator.evaluator_communicate import CommunicateEvaluator
+from tau2.evaluator.evaluator_env import EnvironmentEvaluator
+from tau2.evaluator.evaluator_nl_assertions import NLAssertionsEvaluator
 from tau2.registry import registry
 
 
@@ -91,7 +81,6 @@ def evaluate_simulation(
     evaluation_type: EvaluationType,
     solo_mode: bool,
     domain: str,
-    mode: CommunicationMode = CommunicationMode.HALF_DUPLEX,
     env_kwargs: dict = None,
     strict_replay: bool = True,
 ) -> RewardInfo:
@@ -104,9 +93,6 @@ def evaluate_simulation(
         evaluation_type: The type of evaluation to perform.
         solo_mode: Whether the agent is in solo mode.
         domain: The domain name.
-        mode: The communication mode (HALF_DUPLEX or FULL_DUPLEX).
-              Defaults to HALF_DUPLEX. In FULL_DUPLEX mode, evaluation uses
-              simulation.ticks instead of simulation.messages.
         strict_replay: Whether the environment replay should raise when a
               replayed tool call's output differs from the recorded one.
               Live evaluation keeps the default (True); trajectory re-grading
@@ -136,21 +122,12 @@ def evaluate_simulation(
     if env_kwargs is None:
         env_kwargs = {}
 
-    # Select trajectory and evaluators based on mode
-    is_full_duplex = mode == CommunicationMode.FULL_DUPLEX
-    trajectory = simulation.ticks if is_full_duplex else simulation.messages
+    trajectory = simulation.messages
 
-    # Select evaluator classes based on mode
-    EnvEvaluator = (
-        FullDuplexEnvironmentEvaluator if is_full_duplex else EnvironmentEvaluator
-    )
-    NLEvaluator = (
-        FullDuplexNLAssertionsEvaluator if is_full_duplex else NLAssertionsEvaluator
-    )
-    CommEvaluator = (
-        FullDuplexCommunicateEvaluator if is_full_duplex else CommunicateEvaluator
-    )
-    ActEvaluator = FullDuplexActionEvaluator if is_full_duplex else ActionEvaluator
+    EnvEvaluator = EnvironmentEvaluator
+    NLEvaluator = NLAssertionsEvaluator
+    CommEvaluator = CommunicateEvaluator
+    ActEvaluator = ActionEvaluator
 
     # Get tool types from the environment for action evaluation
     tool_types: Optional[dict[str, ToolType]] = None

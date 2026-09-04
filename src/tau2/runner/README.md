@@ -40,12 +40,10 @@ Turns names and configuration into live instances using the registry for name re
 - `build_environment(domain)` -- Resolve domain name to environment instance.
 - `build_agent(agent_name, environment)` -- Resolve agent name to agent instance.
 - `build_user(user_name, environment, task)` -- Resolve user name to user instance.
-- `build_voice_user(environment, task, audio_native_config)` -- Build voice user with all config wiring.
 
 **High-level builders** (take `RunConfig`):
 - `build_text_orchestrator(config, task)` -- Build a half-duplex `Orchestrator` from `TextRunConfig`.
-- `build_voice_orchestrator(config, task)` -- Build a full-duplex `FullDuplexOrchestrator` from `VoiceRunConfig`.
-- `build_orchestrator(config, task)` -- Dispatcher; delegates to the appropriate builder based on config type.
+- `build_orchestrator(config, task)` -- Thin wrapper over `build_text_orchestrator`.
 
 ```python
 from tau2.runner import build_text_orchestrator, run_simulation
@@ -63,10 +61,8 @@ High-level batch execution with all operational concerns:
 - **Concurrency**: Thread pool with configurable `max_concurrency`.
 - **Checkpointing**: Atomic save/resume via `checkpoint.py`.
 - **Retries**: Configurable retry with delay via `progress.py`.
-- **Hallucination retries**: When `hallucination_retries > 0` (full-duplex only), re-runs simulations where the user simulator hallucinates, using feedback from `check_hallucination()` in `evaluator.reviewer`.
-- **LiveKit pre-registration**: Calls `preregister_livekit_plugins()` on the main thread before spawning workers (required for LiveKit provider).
 - **Status monitoring**: Periodic progress display (every 30s).
-- **Side effects**: Auto-review, audio saving, per-task logging.
+- **Side effects**: Auto-review, per-task logging.
 
 Entry points:
 - `run_domain(config)` -- Full pipeline: load tasks, filter, run batch, display metrics.

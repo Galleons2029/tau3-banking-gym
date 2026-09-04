@@ -39,7 +39,7 @@ See `tau2 run --help` or [CLI Reference](cli-reference.md) for all options.
 
 ## Level 2: Config-Based Python API (Intermediate)
 
-For programmatic use, create a `TextRunConfig` (for text/half-duplex) or `VoiceRunConfig` (for voice/full-duplex) and call `run_domain()`:
+For programmatic use, create a `TextRunConfig` and call `run_domain()`:
 
 ### Text (half-duplex) simulations
 
@@ -64,26 +64,6 @@ metrics = compute_metrics(results)
 print(f"Average reward: {metrics.avg_reward}")
 ```
 
-### Voice (full-duplex) simulations
-
-```python
-from tau2 import VoiceRunConfig
-from tau2.data_model.simulation import AudioNativeConfig
-from tau2.runner import run_domain
-
-config = VoiceRunConfig(
-    domain="airline",
-    audio_native_config=AudioNativeConfig(
-        provider="openai",
-        model="gpt-4o-realtime-preview",
-    ),
-    llm_user="openai/gpt-4.1",
-    speech_complexity="regular",
-)
-
-results = run_domain(config)
-```
-
 ### Knowledge retrieval simulations
 
 ```python
@@ -102,7 +82,7 @@ config = TextRunConfig(
 results = run_domain(config)
 ```
 
-Both types share a common `BaseRunConfig` with fields like `domain`, `num_trials`, `seed`, `hallucination_retries`, etc. The `RunConfig` type alias is `Union[TextRunConfig, VoiceRunConfig]`.
+`TextRunConfig` extends `BaseRunConfig`, which carries fields like `domain`, `num_trials`, and `seed`. The `RunConfig` type alias resolves to `TextRunConfig`.
 
 This handles everything: task loading, filtering, concurrency, checkpointing, metrics display.
 
@@ -218,28 +198,6 @@ result = run_simulation(orchestrator)
 print(f"Reward: {result.reward_info.reward}")
 ```
 
-### Audio-native (voice) simulations
-
-```python
-from tau2.runner import build_voice_orchestrator, run_simulation, get_tasks
-from tau2 import VoiceRunConfig
-from tau2.data_model.simulation import AudioNativeConfig
-
-config = VoiceRunConfig(
-    domain="airline",
-    audio_native_config=AudioNativeConfig(
-        provider="openai",
-        model="gpt-4o-realtime-preview",
-    ),
-    llm_user="openai/gpt-4.1",
-    speech_complexity="regular",
-)
-
-tasks = get_tasks("airline")
-orchestrator = build_voice_orchestrator(config, tasks[0], seed=42)
-result = run_simulation(orchestrator)
-```
-
 ---
 
 ## API Reference
@@ -251,18 +209,16 @@ result = run_simulation(orchestrator)
 ### Layer 2: Build
 
 - **`build_environment(domain, *, solo_mode=False, env_kwargs=None)`** -- Build an environment from a domain name.
-- **`build_agent(agent_name, environment, *, llm, llm_args, task, audio_native_config, solo_mode, audio_taps_dir)`** -- Build an agent from a registered name.
+- **`build_agent(agent_name, environment, *, llm, llm_args, task, solo_mode)`** -- Build an agent from a registered name.
 - **`build_user(user_name, environment, task, *, llm, llm_args, persona_config, solo_mode)`** -- Build a half-duplex user from a registered name.
-- **`build_voice_user(environment, task, audio_native_config, *, llm, llm_args, voice_settings, persona_config, speech_complexity, seed, domain, hallucination_feedback, audio_taps_dir)`** -- Build a full-duplex voice user simulator.
 - **`build_text_orchestrator(config, task, *, seed, simulation_id, user_persona_config)`** -- Build a half-duplex `Orchestrator` from a `TextRunConfig`.
-- **`build_voice_orchestrator(config, task, *, seed, simulation_id, user_voice_settings, user_persona_config, hallucination_feedback, audio_taps_dir)`** -- Build a full-duplex `FullDuplexOrchestrator` from a `VoiceRunConfig`.
-- **`build_orchestrator(config, task, *, seed, simulation_id, user_voice_settings, user_persona_config, hallucination_feedback, audio_taps_dir)`** -- Dispatcher that calls `build_text_orchestrator` or `build_voice_orchestrator` based on config type.
+- **`build_orchestrator(config, task, *, seed, simulation_id, user_persona_config)`** -- Thin wrapper over `build_text_orchestrator`.
 
 ### Layer 3: Batch Execution
 
 - **`run_domain(config)`** -- Run all tasks for a domain from a `RunConfig`. Handles task loading, filtering, save paths, metrics.
 - **`run_tasks(config, tasks, *, save_path, save_dir, evaluation_type=EvaluationType.ALL_WITH_NL_ASSERTIONS, console_display)`** -- Run a list of tasks with concurrency, checkpointing, and retries. Note: defaults to `ALL_WITH_NL_ASSERTIONS` (unlike `run_simulation` which defaults to `ALL`).
-- **`run_single_task(config, task, *, seed, evaluation_type, save_dir, ...)`** -- Run one task with logging and optional side effects (auto-review, audio saving).
+- **`run_single_task(config, task, *, seed, evaluation_type, save_dir, ...)`** -- Run one task with logging and optional side effects (auto-review).
 
 ### Helpers
 

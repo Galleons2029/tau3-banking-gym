@@ -1,9 +1,7 @@
 """
 Base user simulator classes.
 
-This module defines user-specific base classes for both protocols:
-- HalfDuplexUser: For turn-based users (uses generate_next_message)
-- FullDuplexUser: For streaming users (uses get_next_chunk)
+HalfDuplexUser: base class for turn-based users (uses generate_next_message).
 """
 
 from abc import ABC
@@ -11,15 +9,10 @@ from typing import Generic, Optional, TypeVar
 
 from pydantic import BaseModel
 
-from tau2.agent.base.participant import (
-    FullDuplexParticipant,
-    HalfDuplexParticipant,
-    VoiceParticipantMixin,
-)
+from tau2.agent.base.participant import HalfDuplexParticipant
 from tau2.data_model.message import (
     APICompatibleMessage,
     AssistantMessage,
-    EnvironmentMessage,
     Message,
     MultiToolMessage,
     SystemMessage,
@@ -149,80 +142,3 @@ class HalfDuplexUser(
         Stops the user simulator.
         """
         pass
-
-
-# =============================================================================
-# FULL-DUPLEX USERS
-# =============================================================================
-
-
-class FullDuplexUser(
-    FullDuplexParticipant[AssistantMessage, UserMessage, UserStateType],
-    ABC,
-    Generic[UserStateType],
-):
-    """
-    Base class for full-duplex (streaming) user simulators.
-
-    Streaming users use get_next_chunk() for continuous communication.
-    They do NOT implement generate_next_message().
-
-    User developers must implement:
-    - get_next_chunk: Process incoming chunks and generate outgoing chunks
-    - get_init_state: Get the initial state of the user
-    """
-
-    def __init__(
-        self,
-        instructions: Optional[str] = None,
-        tools: Optional[list[Tool]] = None,
-    ):
-        self.instructions = instructions
-        self.tools = tools
-
-    def stop(
-        self,
-        participant_chunk: Optional[Message] = None,
-        state: Optional[UserStateType] = None,
-        tool_results: Optional[EnvironmentMessage] = None,
-    ) -> None:
-        """
-        Stops the user simulator.
-
-        Args:
-            participant_chunk: The last chunk from the agent.
-            state: The user state.
-            tool_results: Any pending tool results not yet delivered.
-        """
-        pass
-
-
-# =============================================================================
-# VOICE USERS (can be used with either protocol)
-# =============================================================================
-
-
-class HalfDuplexVoiceUser(
-    VoiceParticipantMixin[ValidUserInputMessage, UserMessage],
-    HalfDuplexUser[UserStateType],
-    ABC,
-    Generic[UserStateType],
-):
-    """
-    Base class for half-duplex users that support voice communication.
-    """
-
-    pass
-
-
-class FullDuplexVoiceUser(
-    VoiceParticipantMixin[AssistantMessage, UserMessage],
-    FullDuplexUser[UserStateType],
-    ABC,
-    Generic[UserStateType],
-):
-    """
-    Base class for full-duplex users that support voice communication.
-    """
-
-    pass

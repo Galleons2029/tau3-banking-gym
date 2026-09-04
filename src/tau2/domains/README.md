@@ -25,7 +25,6 @@ Each domain has its own folder with the following structure:
 All the data for the domain is stored in `data/tau2/domains/<domain_name>` folder.
 Should contain:
 - `tasks.json`: A JSON file containing the tasks for the domain.
-- `tasks_voice.json`: A JSON file containing the voice tasks for the domain.
 - `split_tasks.json`: A JSON file containing the task splits for the domain.
     - The split file naming follows the pattern `split_<tasks_file_stem>.json` (e.g. `split_tasks.json` for `tasks.json`).
     - The task splits are defined as a dictionary mapping split names to lists of task IDs.

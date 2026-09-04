@@ -4,9 +4,6 @@ from typing import Callable, Dict, Optional
 from loguru import logger
 from pydantic import BaseModel
 
-from tau2.agent.discrete_time_audio_native_agent import (
-    create_discrete_time_audio_native_agent,
-)
 from tau2.agent.llm_agent import (
     LLMGTAgent,
     LLMSoloAgent,
@@ -55,7 +52,7 @@ from tau2.domains.telecom.environment import (
 )
 from tau2.environment.environment import Environment
 from tau2.user.user_simulator import DummyUser, UserSimulator
-from tau2.user.user_simulator_base import FullDuplexUser, HalfDuplexUser
+from tau2.user.user_simulator_base import HalfDuplexUser
 
 
 class RegistryInfo(BaseModel):
@@ -71,7 +68,7 @@ class Registry:
     """Registry for Users, Agents, and Domains"""
 
     def __init__(self):
-        self._users: Dict[str, type] = {}  # HalfDuplexUser or FullDuplexUser
+        self._users: Dict[str, type] = {}
         self._agent_factories: Dict[str, Callable] = {}  # Factory functions for agents
         self._agent_task_filters: Dict[
             str, Callable[[Task], bool]
@@ -86,14 +83,11 @@ class Registry:
         user_constructor: type,
         name: Optional[str] = None,
     ):
-        """Decorator to register a new User implementation (half-duplex or full-duplex)"""
+        """Decorator to register a new User implementation"""
         try:
-            if not (
-                issubclass(user_constructor, HalfDuplexUser)
-                or issubclass(user_constructor, FullDuplexUser)
-            ):
+            if not issubclass(user_constructor, HalfDuplexUser):
                 raise TypeError(
-                    f"{user_constructor.__name__} must implement HalfDuplexUser or FullDuplexUser"
+                    f"{user_constructor.__name__} must implement HalfDuplexUser"
                 )
             key = name or user_constructor.__name__
             if key in self._users:
@@ -211,7 +205,7 @@ class Registry:
             raise
 
     def get_user_constructor(self, name: str) -> type:
-        """Get a registered User implementation by name (half-duplex or full-duplex)"""
+        """Get a registered User implementation by name"""
         if name not in self._users:
             raise KeyError(f"User {name} not found in registry")
         return self._users[name]
@@ -282,17 +276,6 @@ try:
     # User implementations
     registry.register_user(UserSimulator, "user_simulator")
     registry.register_user(DummyUser, "dummy_user")
-    try:
-        from tau2.user.user_simulator_streaming import VoiceStreamingUserSimulator
-
-        registry.register_user(
-            VoiceStreamingUserSimulator, "voice_streaming_user_simulator"
-        )
-    except ImportError:
-        logger.debug(
-            "Voice dependencies not installed, skipping voice user registration"
-        )
-
     # Agent factories
     registry.register_agent_factory(create_llm_agent, "llm_agent")
     registry.register_agent_factory(
@@ -305,10 +288,6 @@ try:
         "llm_agent_solo",
         task_filter=LLMSoloAgent.check_valid_task,
         metadata={"solo_mode": True},
-    )
-    registry.register_agent_factory(
-        create_discrete_time_audio_native_agent,
-        "discrete_time_audio_native_agent",
     )
     registry.register_domain(mock_domain_get_environment, "mock")
     registry.register_tasks(mock_domain_get_tasks, "mock")

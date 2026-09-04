@@ -4,7 +4,6 @@ from loguru import logger
 
 from tau2.agent.base.llm_config import LLMConfigMixin
 from tau2.data_model.message import (
-    AssistantMessage,
     Message,
     MultiToolMessage,
     SystemMessage,
@@ -37,14 +36,6 @@ GLOBAL_USER_SIM_GUIDELINES_PATH_TOOLS = (
     GLOBAL_USER_SIM_GUIDELINES_DIR / "simulation_guidelines_tools.md"
 )
 
-GLOBAL_USER_SIM_GUIDELINES_PATH_VOICE = (
-    GLOBAL_USER_SIM_GUIDELINES_DIR / "simulation_guidelines_voice.md"
-)
-
-GLOBAL_USER_SIM_GUIDELINES_PATH_VOICE_TOOLS = (
-    GLOBAL_USER_SIM_GUIDELINES_DIR / "simulation_guidelines_voice_tools.md"
-)
-
 
 def get_global_user_sim_guidelines(use_tools: bool = False) -> str:
     """
@@ -61,25 +52,6 @@ def get_global_user_sim_guidelines(use_tools: bool = False) -> str:
             user_sim_guidelines = fp.read()
     else:
         with open(GLOBAL_USER_SIM_GUIDELINES_PATH, "r") as fp:
-            user_sim_guidelines = fp.read()
-    return user_sim_guidelines
-
-
-def get_global_user_sim_guidelines_voice(use_tools: bool = False) -> str:
-    """
-    Get the global user simulator guidelines for voice mode.
-
-    Args:
-        use_tools: Whether to use the tools guidelines.
-
-    Returns:
-        The global user simulator guidelines for voice mode.
-    """
-    if use_tools:
-        with open(GLOBAL_USER_SIM_GUIDELINES_PATH_VOICE_TOOLS, "r") as fp:
-            user_sim_guidelines = fp.read()
-    else:
-        with open(GLOBAL_USER_SIM_GUIDELINES_PATH_VOICE, "r") as fp:
             user_sim_guidelines = fp.read()
     return user_sim_guidelines
 
@@ -186,7 +158,6 @@ class UserSimulator(
         """
         if message.is_tool_call():
             return False
-        # Audio-only messages (chunks) don't have text content
         if message.content is None:
             return False
         return (
@@ -215,10 +186,6 @@ class UserSimulator(
         Returns:
             The user message.
         """
-        if isinstance(message, AssistantMessage) and message.is_audio:
-            raise ValueError(
-                "Assistant message cannot be audio. Use VoiceUserSimulator instead."
-            )
         logger.debug(f"User responds to message: {message}")
         # Updating state with new message
         # Skip empty messages (e.g., empty chunks from streaming mode)

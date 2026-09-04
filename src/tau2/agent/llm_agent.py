@@ -118,8 +118,6 @@ class LLMAgent(
         """
         Generate the next message from a user or tool message.
         """
-        if isinstance(message, UserMessage) and message.is_audio:
-            raise ValueError("User message cannot be audio. Use VoiceLLMAgent instead.")
         if isinstance(message, MultiToolMessage):
             state.messages.extend(message.tool_messages)
         else:

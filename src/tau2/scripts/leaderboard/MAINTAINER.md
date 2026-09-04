@@ -1,5 +1,10 @@
 # Leaderboard Maintainer Guide
 
+> **Note:** This harness reviews and publishes **text** submissions only. The
+> `voice_submissions` array and the `modality: "voice"` entries already in the
+> manifest are historical — their schema is still validated, but the tooling to
+> review, recompute or backfill voice interaction metrics has been removed.
+
 ## Prerequisites
 
 - AWS CLI configured with `tau-bench-ci` profile
@@ -14,10 +19,11 @@ When someone opens a PR with a new `submission.json`:
 
 Check the submission.json manually:
 - Directory name follows `{model_name}_{org}_{date}` convention
-- `manifest.json` is updated (correct array: `submissions`, `voice_submissions`, or `legacy_submissions`)
+- `manifest.json` is updated (correct array: `submissions` or `legacy_submissions`;
+  `voice_submissions` is historical and takes no new entries)
 - `submission_type` is `"standard"` or `"custom"` (if custom: check `methodology.notes` and `references`)
 - Contact info is present
-- For voice: `modality` is `"voice"`, `voice_config` is present
+- `modality` is `"text"`
 
 ### 2. Download their trajectories
 
@@ -30,9 +36,8 @@ mkdir -p /tmp/review-trajectories
 # ... download to /tmp/review-trajectories/
 ```
 
-The trajectory source should contain either:
-- **Text**: One or more `results.json` (or `*.json`) files, one per domain
-- **Voice**: One or more experiment directories, each containing `results.json` + `simulations/` + `artifacts/*/audio/`
+The trajectory source should contain one or more `results.json` (or `*.json`)
+files, one per domain.
 
 ### 3. Run the review script
 
@@ -52,10 +57,9 @@ The script will:
 1. Parse the PR's `submission.json`
 2. Load and validate trajectory files (format, task coverage, trial counts)
 3. Recompute metrics and compare against submitted scores
-4. (Voice) Recompute `interaction_metrics` from the tick data, replacing any submitter-provided values
-5. Update `submission.json` with `trajectories_available: true` and `trajectory_files`
-6. (With `--upload`) Upload trajectories and updated `submission.json` to S3
-7. (With `--upload`) Verify the upload (HTTP 200, file sizes match)
+4. Update `submission.json` with `trajectories_available: true` and `trajectory_files`
+5. (With `--upload`) Upload trajectories and updated `submission.json` to S3
+6. (With `--upload`) Verify the upload (HTTP 200, file sizes match)
 
 ### 4. Verify upload separately (optional)
 
@@ -103,28 +107,9 @@ aws s3 rm s3://sierra-tau-bench-public/submissions/<dir>/trajectories/<file> --p
 aws s3 cp /local/path s3://sierra-tau-bench-public/submissions/<dir>/trajectories/<file> --profile tau-bench-ci
 ```
 
-## Backfilling Interaction Metrics
-
-If the interaction-metric code changes in a way that warrants recomputation
-(major refactor — see `INTERACTION_METRICS_VERSION`), or a voice submission is
-missing its `interaction_metrics` block, recompute from the public S3
-trajectories:
-
-```bash
-# All voice submissions in the manifest (downloads trajectories to ~/.cache/tau2/)
-python -m tau2.scripts.leaderboard.backfill_interaction_metrics
-
-# Specific submissions, or a dry run
-python -m tau2.scripts.leaderboard.backfill_interaction_metrics \
-  --submissions gpt-realtime-2_openai_2026-06-24 --dry-run
-```
-
-The script patches the local `web/leaderboard/public/submissions/<dir>/submission.json`
-files; commit them via PR and the GitHub Actions sync pushes them to S3.
-
 ## Troubleshooting
 
-### Large voice trajectory files get corrupted during upload
+### Large trajectory files get corrupted during upload
 
 Files over ~500 MB can get corrupted during S3 multipart upload. Symptoms:
 - S3 file size differs from local
@@ -139,18 +124,3 @@ echo "local: $local_size, s3: $s3_size"
 ```
 
 If corrupted, delete and re-upload with `aws s3 cp` (not sync).
-
-### Voice trajectory files are very large
-
-Voice experiments use a directory-based format: `results.json` contains only metadata,
-while simulation data is split into individual files under `simulations/`. The total
-size can still be 100 MB - 1 GB+ across all files. The `prepare_submission` script
-copies only `results.json`, `simulations/`, and canonical audio from `artifacts/`.
-
-If uploading large directories manually, consider syncing entire experiment directories:
-
-```bash
-aws s3 sync /local/experiment_dir/ \
-  s3://sierra-tau-bench-public/submissions/<dir>/trajectories/<exp>/ \
-  --profile tau-bench-ci
-```

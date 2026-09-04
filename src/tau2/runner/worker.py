@@ -22,7 +22,7 @@ from typing import Optional
 import httpx
 from loguru import logger
 
-from tau2.data_model.simulation import SimulationRun, TextRunConfig, VoiceRunConfig
+from tau2.data_model.simulation import SimulationRun, TextRunConfig
 from tau2.data_model.tasks import Task
 from tau2.evaluator.evaluator import EvaluationType
 from tau2.runner.work import WorkUnit
@@ -34,7 +34,7 @@ HEARTBEAT_INTERVAL_SECONDS = 30.0
 POLL_INTERVAL_SECONDS = 1.0
 POST_RETRIES = 3
 
-# /complete and /fail carry a full SimulationRun (voice sims with verbose tick
+# /complete and /fail carry a full SimulationRun (verbose runs with per-task
 # logs run to many MB) and the controller may be mid-checkpoint-write when
 # the request lands, so read/write get minutes, not the httpx 5s default.
 HTTP_TIMEOUT = httpx.Timeout(300.0, connect=10.0)
@@ -101,7 +101,7 @@ class ControllerClient:
 class HeartbeatThread(threading.Thread):
     """Keeps leases alive independently of the worker's main loop.
 
-    The main loop blocks on /complete posts (multi-MB voice results) and on
+    The main loop blocks on /complete posts (multi-MB results) and on
     execute_lease setup, so heartbeating from there starves under load: in the
     first field run a ~3-minute stall expired live leases and the controller
     re-ran sims that were still going. A lease the controller reports lost is
@@ -159,46 +159,27 @@ def execute_lease(payload: dict) -> SimulationRun:
     """Execute one leased unit: rebuild the run context from the payload and
     run the same code the local loop runs. No checkpoint fns, no monitor —
     the result goes back to the controller."""
-    from tau2.runner.batch import _BatchContext, make_voice_run_settings, run_unit
+    from tau2.runner.batch import _BatchContext, run_unit
     from tau2.runner.helpers import get_info
 
     unit = WorkUnit.model_validate(payload["unit"])
     run = payload["run"]
-    config_cls = VoiceRunConfig if run["config_kind"] == "voice" else TextRunConfig
-    config = config_cls.model_validate(run["config"])
+    config = TextRunConfig.model_validate(run["config"])
     task = Task.model_validate(run["task"])
     save_dir = Path(run["save_dir"]) if run.get("save_dir") else None
 
-    user_voice_settings, user_persona_config = make_voice_run_settings(config)
-    info = get_info(
-        config,
-        user_persona_config=user_persona_config,
-        user_voice_settings=user_voice_settings,
-    )
+    user_persona_config = None
+    info = get_info(config, user_persona_config=user_persona_config)
     ctx = _BatchContext(
         config=config,
         evaluation_type=EvaluationType(run["evaluation_type"]),
         save_dir=save_dir,
-        user_voice_settings=user_voice_settings,
         user_persona_config=user_persona_config,
         info=info,
         console_display=False,
         llm_log_mode_value=run.get("llm_log_mode"),
     )
     return run_unit(ctx, task, unit.trial, unit.seed, unit.progress_str)
-
-
-def _maybe_preregister_livekit(run_payload: dict, registered: set) -> None:
-    """LiveKit plugins must be registered on the worker's main thread before
-    sim threads spawn (same constraint as the local loop)."""
-    if "livekit" in registered:
-        return
-    audio_config = (run_payload.get("config") or {}).get("audio_native_config") or {}
-    if audio_config.get("provider") == "livekit":
-        from tau2.voice.audio_native.livekit import preregister_livekit_plugins
-
-        preregister_livekit_plugins()
-        registered.add("livekit")
 
 
 def worker_loop(
@@ -213,7 +194,6 @@ def worker_loop(
     executor = ThreadPoolExecutor(max_workers=slots)
     inflight: dict[Future, str] = {}
     inflight_lock = threading.Lock()
-    preregistered: set = set()
 
     def inflight_ids() -> list[str]:
         with inflight_lock:
@@ -254,7 +234,6 @@ def worker_loop(
             if len(inflight) < slots:
                 body = client.lease(worker_id)
                 if body["status"] == "unit":
-                    _maybe_preregister_livekit(body["run"], preregistered)
                     heartbeats.leased(body["unit"]["unit_id"])
                     future = executor.submit(execute_lease, body)
                     with inflight_lock:

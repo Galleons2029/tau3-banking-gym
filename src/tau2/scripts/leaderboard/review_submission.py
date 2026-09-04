@@ -34,13 +34,6 @@ from urllib.request import urlopen
 from rich.console import Console
 
 from tau2.data_model.simulation import Results as TrajectoryResults
-from tau2.metrics.voice_interaction_metrics import NoVoiceTicksError
-from tau2.scripts.leaderboard.compute_interaction_metrics import (
-    build_interaction_metrics_block,
-    compute_metrics_for_loaded_results,
-    config_with_resolved_ticks,
-    resolve_experiment_config,
-)
 from tau2.scripts.leaderboard.prepare_submission import (
     validate_submission_metrics,
     validate_submission_traj_set,
@@ -70,19 +63,11 @@ def _load_submission(submission_dir: Path, console: Console) -> Submission:
         return Submission.model_validate_json(f.read())
 
 
-def _discover_trajectory_files(
-    source: Path, is_voice: bool, console: Console
-) -> list[str]:
+def _discover_trajectory_files(source: Path, console: Console) -> list[str]:
     """Find trajectory results.json files in the source directory."""
-    if is_voice:
-        # Voice: look for results.json inside experiment directories
-        files = sorted(source.glob("*/results.json"))
-        if not files:
-            files = sorted(source.glob("results.json"))
-    else:
-        files = expand_paths([source], extension=".json")
-        files = [str(f) for f in files] if not isinstance(files[0], str) else files
-        files = [Path(f) for f in files]
+    files = expand_paths([source], extension=".json")
+    files = [str(f) for f in files] if not isinstance(files[0], str) else files
+    files = [Path(f) for f in files]
 
     if not files:
         console.print("[red]No trajectory files found in source directory[/red]")
@@ -144,75 +129,31 @@ def _validate(
 def _build_trajectory_map(
     results_list: list[TrajectoryResults],
     trajectory_files: list[str],
-    is_voice: bool,
 ) -> dict[str, str]:
-    """Build the domain -> filename/dirname mapping for submission.json."""
+    """Build the domain -> filename mapping for submission.json."""
     mapping = {}
     for r, path in zip(results_list, trajectory_files):
         domain = r.info.environment_info.domain_name
         p = Path(path)
-        if is_voice:
-            mapping[domain] = p.parent.name
+        if p.name == "results.json":
+            mapping[domain] = f"{domain}_results.json"
         else:
-            if p.name == "results.json":
-                mapping[domain] = f"{domain}_results.json"
-            else:
-                mapping[domain] = p.name
+            mapping[domain] = p.name
     return mapping
-
-
-def _compute_interaction_metrics(
-    results_list: list[TrajectoryResults],
-    console: Console,
-) -> dict | None:
-    """Recompute voice interaction metrics from the reviewed trajectories.
-
-    Maintainer-side recomputation is the anti-gaming guarantee: the values on
-    the leaderboard come from the submitted tick data, not from self-reported
-    numbers.
-    """
-    domain_metrics: dict[str, dict] = {}
-    resolved_configs = []
-    for results in results_list:
-        domain = results.info.environment_info.domain_name
-        if domain in domain_metrics:
-            raise ValueError(f"Domain {domain} appears in multiple trajectory files")
-        try:
-            domain_metrics[domain] = compute_metrics_for_loaded_results(results)
-            resolved_configs.append(resolve_experiment_config(results))
-            console.print(f"  [green]OK[/green] {domain}")
-        except NoVoiceTicksError:
-            console.print(
-                f"  [yellow]WARN[/yellow] {domain}: no tick data, "
-                "skipping interaction metrics for this domain"
-            )
-    if not domain_metrics:
-        return None
-    return build_interaction_metrics_block(
-        domain_metrics, config_with_resolved_ticks(None, resolved_configs)
-    )
 
 
 def _update_submission_json(
     submission_dir: Path,
     trajectory_map: dict[str, str],
     console: Console,
-    interaction_metrics: dict | None = None,
 ) -> None:
-    """Update submission.json with trajectory references and recomputed metrics."""
+    """Update submission.json with trajectory references."""
     submission_file = submission_dir / SUBMISSION_FILE_NAME
     with open(submission_file) as f:
         data = json.load(f)
 
     data["trajectories_available"] = True
     data["trajectory_files"] = trajectory_map
-    if interaction_metrics is not None:
-        if data.get("interaction_metrics") not in (None, interaction_metrics):
-            console.print(
-                "  [yellow]Replacing submitter-provided interaction_metrics "
-                "with recomputed values[/yellow]"
-            )
-        data["interaction_metrics"] = interaction_metrics
 
     with open(submission_file, "w") as f:
         json.dump(data, f, indent=2, default=str)
@@ -244,7 +185,6 @@ def _upload(
     submission_dir: Path,
     trajectory_files: list[str],
     trajectory_map: dict[str, str],
-    is_voice: bool,
     profile: str,
     console: Console,
 ) -> None:
@@ -254,29 +194,14 @@ def _upload(
 
     console.print("\n[bold]Uploading trajectories to S3...[/bold]")
 
-    if is_voice:
-        for path_str in trajectory_files:
-            p = Path(path_str)
-            exp_dir = p.parent
-            exp_name = exp_dir.name
-            s3_dest = f"s3://{S3_BUCKET}/{traj_prefix}/{exp_name}/"
-            console.print(f"  Syncing {exp_dir.name}/...")
-            _run_aws(
-                ["s3", "sync", str(exp_dir), s3_dest],
-                profile,
-                console,
-            )
-    else:
-        for path_str, (domain, dest_name) in zip(
-            trajectory_files, trajectory_map.items()
-        ):
-            s3_dest = f"s3://{S3_BUCKET}/{traj_prefix}/{dest_name}"
-            console.print(f"  Uploading {dest_name}...")
-            _run_aws(
-                ["s3", "cp", path_str, s3_dest],
-                profile,
-                console,
-            )
+    for path_str, (domain, dest_name) in zip(trajectory_files, trajectory_map.items()):
+        s3_dest = f"s3://{S3_BUCKET}/{traj_prefix}/{dest_name}"
+        console.print(f"  Uploading {dest_name}...")
+        _run_aws(
+            ["s3", "cp", path_str, s3_dest],
+            profile,
+            console,
+        )
 
     console.print("\n[bold]Uploading submission.json to S3...[/bold]")
     local_sub = str(submission_dir / SUBMISSION_FILE_NAME)
@@ -288,7 +213,6 @@ def _verify_upload(
     submission_dir: Path,
     trajectory_files: list[str],
     trajectory_map: dict[str, str],
-    is_voice: bool,
     profile: str,
     console: Console,
 ) -> None:
@@ -317,10 +241,7 @@ def _verify_upload(
 
     # Verify each trajectory file
     for domain, dest_name in trajectory_map.items():
-        if is_voice:
-            url = f"{S3_PUBLIC_URL}/{submission_dir.name}/{TRAJECTORY_FILES_DIR_NAME}/{dest_name}/results.json"
-        else:
-            url = f"{S3_PUBLIC_URL}/{submission_dir.name}/{TRAJECTORY_FILES_DIR_NAME}/{dest_name}"
+        url = f"{S3_PUBLIC_URL}/{submission_dir.name}/{TRAJECTORY_FILES_DIR_NAME}/{dest_name}"
 
         # Find the corresponding local file for size comparison
         local_path = None
@@ -410,7 +331,6 @@ def main():
     # Step 1: Load submission.json
     console.print("\n[bold]Step 1: Loading submission.json...[/bold]")
     submission = _load_submission(submission_dir, console)
-    is_voice = submission.modality == "voice"
     console.print(f"  Model: {submission.model_name}")
     console.print(f"  Organization: {submission.model_organization}")
     console.print(f"  Modality: {submission.modality}")
@@ -418,7 +338,7 @@ def main():
 
     # Discover trajectory files
     console.print("\n[bold]Discovering trajectory files...[/bold]")
-    trajectory_files = _discover_trajectory_files(source, is_voice, console)
+    trajectory_files = _discover_trajectory_files(source, console)
 
     if args.verify_only:
         # Build map from existing submission or from files
@@ -426,12 +346,11 @@ def main():
             trajectory_map = dict(submission.trajectory_files)
         else:
             results = [TrajectoryResults.load(f) for f in trajectory_files]
-            trajectory_map = _build_trajectory_map(results, trajectory_files, is_voice)
+            trajectory_map = _build_trajectory_map(results, trajectory_files)
         _verify_upload(
             submission_dir,
             trajectory_files,
             trajectory_map,
-            is_voice,
             args.aws_profile,
             console,
         )
@@ -441,24 +360,14 @@ def main():
     results = _validate(submission, trajectory_files, console)
 
     # Build trajectory map
-    trajectory_map = _build_trajectory_map(results, trajectory_files, is_voice)
+    trajectory_map = _build_trajectory_map(results, trajectory_files)
     console.print(f"\n[bold]Trajectory file mapping:[/bold]")
     for domain, name in trajectory_map.items():
         console.print(f"  {domain} -> {name}")
 
-    # Recompute interaction metrics from the reviewed trajectories (voice only)
-    interaction_metrics = None
-    if is_voice:
-        console.print(
-            "\n[bold]Step 5b: Recomputing voice interaction metrics...[/bold]"
-        )
-        interaction_metrics = _compute_interaction_metrics(results, console)
-
     # Update submission.json
     console.print("\n[bold]Step 6: Updating submission.json...[/bold]")
-    _update_submission_json(
-        submission_dir, trajectory_map, console, interaction_metrics
-    )
+    _update_submission_json(submission_dir, trajectory_map, console)
 
     if args.upload:
         # Upload
@@ -467,7 +376,6 @@ def main():
             submission_dir,
             trajectory_files,
             trajectory_map,
-            is_voice,
             args.aws_profile,
             console,
         )
@@ -478,7 +386,6 @@ def main():
             submission_dir,
             trajectory_files,
             trajectory_map,
-            is_voice,
             args.aws_profile,
             console,
         )

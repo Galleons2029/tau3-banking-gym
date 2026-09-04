@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import json
-import subprocess
 import uuid
 from collections import defaultdict
 from datetime import datetime
@@ -23,13 +22,6 @@ from tau2.data_model.tasks import Task, TaskIssue, TaskIssueStatus
 from tau2.metrics.agent_metrics import compute_metrics, is_successful
 from tau2.utils.display import ConsoleDisplay
 from tau2.utils.utils import DATA_DIR
-
-
-def get_tick_duration_ms(results: Results) -> Optional[int]:
-    """Extract tick_duration_ms from Results.info.audio_native_config."""
-    if results.info.audio_native_config is not None:
-        return int(results.info.audio_native_config.tick_duration_ms)
-    return None
 
 
 def get_available_simulations(sim_dir: Optional[Path] = None):
@@ -197,7 +189,6 @@ def display_simulation_list(
         term_icon = termination_icon_map.get(sim.termination_reason, "?")
         stop_str = f"[{term_color}]{term_icon}[/]"
 
-        # Unresponsive period (from streaming/full-duplex mode)
         if sim.info and "had_unresponsive_period" in sim.info:
             unresponsive_str = (
                 "[red]✗[/]" if sim.info["had_unresponsive_period"] else "[green]✓[/]"
@@ -355,8 +346,6 @@ def display_simulation_with_task(
     sim_index: int,
     domain: str,
     show_details: bool = True,
-    consolidated_ticks: bool = True,
-    tick_duration_ms: Optional[int] = None,
 ):
     """Display a simulation along with its associated task."""
     ConsoleDisplay.console.print("\n" + "=" * 80)  # Separator
@@ -368,8 +357,6 @@ def display_simulation_with_task(
     ConsoleDisplay.display_simulation(
         simulation,
         show_details=show_details,
-        consolidated_ticks=consolidated_ticks,
-        tick_duration_ms=tick_duration_ms,
     )
 
     # Show action menu (skip, add notes, or create task issue)
@@ -577,7 +564,7 @@ def save_simulation_note(
     warnings.warn(
         "save_simulation_note() creates large *_simulation.json files that should not "
         "be committed to git. Use 'export_html.py --results' instead, which reads "
-        "results.json directly. See src/experiments/tau_voice/annotation/README.md.",
+        "results.json directly.",
         DeprecationWarning,
         stacklevel=2,
     )
@@ -825,7 +812,6 @@ def main(
     only_show_failed: bool = False,
     only_show_all_failed: bool = False,
     sim_dir: Optional[str] = None,
-    expanded_ticks: bool = False,
     max_tool_result_length: Optional[int] = 500,
 ):
     ConsoleDisplay.max_tool_result_length = max_tool_result_length
@@ -869,51 +855,9 @@ def main(
                 "   [dim]Display the configuration used for this simulation run[/]"
             )
 
-            has_voice = False
-            voice_sim_path = None
-            audio_file = None
-            if current_sim_path:
-                # Check for half-duplex voice (voice/sim_*/conversation.wav)
-                voice_dirs = list((current_sim_path / "voice").glob("sim_*"))
-                if voice_dirs:
-                    voice_sim_path = voice_dirs[0]
-                    conversation_audio = voice_sim_path / "conversation.wav"
-                    if conversation_audio.exists():
-                        has_voice = True
-                        audio_file = conversation_audio
-
-                # Check for full-duplex audio (audio/both.wav or artifacts/*/sim_*/audio/both.wav)
-                if not has_voice:
-                    # First check top-level audio directory
-                    top_audio = current_sim_path / "audio" / "both.wav"
-                    if top_audio.exists():
-                        has_voice = True
-                        audio_file = top_audio
-                        voice_sim_path = current_sim_path / "audio"
-                    else:
-                        # Check task-specific audio directories
-                        task_audio_dirs = list(
-                            current_sim_path.glob("artifacts/*/sim_*/audio")
-                        )
-                        if task_audio_dirs:
-                            voice_sim_path = task_audio_dirs[0]
-                            both_audio = voice_sim_path / "both.wav"
-                            if both_audio.exists():
-                                has_voice = True
-                                audio_file = both_audio
-
-            if has_voice:
-                ConsoleDisplay.console.print("6. Listen to voice conversation")
-                ConsoleDisplay.console.print(
-                    "   [dim]View simulation and play audio simultaneously[/]"
-                )
-                ConsoleDisplay.console.print("7. Exit")
-                ConsoleDisplay.console.print("   [dim]Close the simulation viewer[/]")
-                choices = ["1", "2", "3", "4", "5", "6", "7"]
-            else:
-                ConsoleDisplay.console.print("6. Exit")
-                ConsoleDisplay.console.print("   [dim]Close the simulation viewer[/]")
-                choices = ["1", "2", "3", "4", "5", "6"]
+            ConsoleDisplay.console.print("6. Exit")
+            ConsoleDisplay.console.print("   [dim]Close the simulation viewer[/]")
+            choices = ["1", "2", "3", "4", "5", "6"]
             default_choice = "3"
         else:
             ConsoleDisplay.console.print("2. Exit")
@@ -983,7 +927,6 @@ def main(
                 sim = results.simulations[sim_index - 1]
                 task = find_task_by_id(results.tasks, sim.task_id)
                 domain = results.info.environment_info.domain_name
-                tick_duration = get_tick_duration_ms(results)
                 if task:
                     display_simulation_with_task(
                         sim,
@@ -992,8 +935,6 @@ def main(
                         sim_index,
                         domain=domain,
                         show_details=True,
-                        consolidated_ticks=not expanded_ticks,
-                        tick_duration_ms=tick_duration,
                     )
                 else:
                     ConsoleDisplay.console.print(
@@ -1002,8 +943,6 @@ def main(
                     ConsoleDisplay.display_simulation(
                         sim,
                         show_details=True,
-                        consolidated_ticks=not expanded_ticks,
-                        tick_duration_ms=tick_duration,
                     )
                 continue
             else:
@@ -1036,86 +975,6 @@ def main(
             # Display run configuration
             ConsoleDisplay.console.clear()
             ConsoleDisplay.display_info(results.info)
-            continue
-
-        elif results and choice == "6" and has_voice:
-            # Listen to voice conversation - select simulation first
-            display_simulation_list(results, only_show_failed, only_show_all_failed)
-
-            sim_count = len(results.simulations)
-            sim_index = IntPrompt.ask(
-                f"\nSelect simulation to listen to (1-{sim_count})", default=1
-            )
-
-            if 1 <= sim_index <= sim_count:
-                sim = results.simulations[sim_index - 1]
-                task = find_task_by_id(results.tasks, sim.task_id)
-
-                # Find audio file for this specific simulation
-                sim_audio_file = None
-                # Check task-specific audio first
-                task_audio_path = (
-                    current_sim_path
-                    / "artifacts"
-                    / f"task_{sim.task_id}"
-                    / f"sim_{sim.id}"
-                    / "audio"
-                    / "both.wav"
-                )
-                if task_audio_path.exists():
-                    sim_audio_file = task_audio_path
-                elif audio_file:
-                    # Fall back to top-level audio
-                    sim_audio_file = audio_file
-
-                if sim_audio_file and sim_audio_file.exists():
-                    # Display simulation content
-                    ConsoleDisplay.console.clear()
-                    if task:
-                        ConsoleDisplay.console.print("\n" + "=" * 80)
-                        ConsoleDisplay.console.print("[bold blue]Task Details:[/]")
-                        ConsoleDisplay.display_task(task)
-
-                    ConsoleDisplay.console.print("\n" + "=" * 80)
-                    ConsoleDisplay.console.print("[bold blue]Simulation Details:[/]")
-                    ConsoleDisplay.display_simulation(
-                        sim,
-                        show_details=True,
-                        consolidated_ticks=not expanded_ticks,
-                        tick_duration_ms=get_tick_duration_ms(results),
-                    )
-
-                    # Start audio playback
-                    ConsoleDisplay.console.print("\n" + "=" * 80)
-                    ConsoleDisplay.console.print("\n[bold blue]🎧 Playing audio...[/]")
-                    ConsoleDisplay.console.print(
-                        "[dim]Press Ctrl+C to stop playback[/]"
-                    )
-                    ConsoleDisplay.console.print(
-                        f"[dim]Audio file: {sim_audio_file}[/]"
-                    )
-
-                    process = subprocess.Popen(["afplay", str(sim_audio_file)])
-
-                    try:
-                        process.wait()
-                        ConsoleDisplay.console.print(
-                            "[green]✓ Finished playing audio[/]"
-                        )
-                    except KeyboardInterrupt:
-                        process.terminate()
-                        process.wait()
-                        ConsoleDisplay.console.print(
-                            "\n[yellow]Audio playback stopped[/]"
-                        )
-
-                    Prompt.ask("\n[dim]Press Enter to continue[/]")
-                else:
-                    ConsoleDisplay.console.print(
-                        f"[red]Audio file not found for simulation {sim.id}[/]"
-                    )
-            else:
-                ConsoleDisplay.console.print("[red]Invalid simulation number[/]")
             continue
 
         else:

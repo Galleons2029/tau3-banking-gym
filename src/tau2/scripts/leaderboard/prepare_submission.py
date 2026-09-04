@@ -7,19 +7,13 @@ from typing import Literal, Optional
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 
-from tau2.config import VOICE_USER_SIMULATOR_VERSION
 from tau2.data_model.simulation import Results as TrajectoryResults
 from tau2.metrics.agent_metrics import AgentMetrics, compute_metrics
-from tau2.scripts.leaderboard.compute_interaction_metrics import (
-    build_interaction_metrics_block,
-    compute_metrics_for_loaded_results,
-)
 from tau2.scripts.leaderboard.submission import (
     SUBMISSION_FILE_NAME,
     TRAJECTORY_FILES_DIR_NAME,
     ContactInfo,
     DomainResults,
-    InteractionMetrics,
     Methodology,
     ModelRelease,
     Reference,
@@ -27,7 +21,6 @@ from tau2.scripts.leaderboard.submission import (
     Submission,
     SubmissionData,
     Verification,
-    VoiceConfig,
 )
 from tau2.scripts.leaderboard.verify_trajectories import (
     VerificationMode,
@@ -35,40 +28,6 @@ from tau2.scripts.leaderboard.verify_trajectories import (
 )
 from tau2.utils.io_utils import expand_paths
 from tau2.utils.utils import get_dict_hash, get_tau2_version
-
-
-def _detect_voice_mode(results_list: list[TrajectoryResults]) -> bool:
-    """Auto-detect whether the submission is voice-based.
-
-    Returns True if any result has audio_native_config set in its info block.
-    """
-    return any(r.info.audio_native_config is not None for r in results_list)
-
-
-def _extract_voice_config(results: TrajectoryResults) -> VoiceConfig:
-    """Extract VoiceConfig from a voice trajectory's info block."""
-    anc = results.info.audio_native_config
-    if anc is None:
-        raise ValueError("Cannot extract voice config: audio_native_config is None")
-
-    # Extract user TTS provider info
-    user_tts_provider = None
-    user_voice = results.info.user_info.voice_settings
-    if user_voice and user_voice.synthesis_config:
-        sc = user_voice.synthesis_config
-        provider = sc.provider
-        model_id = None
-        if sc.provider_config:
-            model_id = getattr(sc.provider_config, "model_id", None)
-        user_tts_provider = f"{provider}/{model_id}" if model_id else provider
-
-    return VoiceConfig(
-        provider=anc.provider,
-        model=anc.model,
-        tick_duration_seconds=getattr(anc, "tick_duration_seconds", None),
-        max_steps_seconds=getattr(anc, "max_steps_seconds", None),
-        user_tts_provider=user_tts_provider,
-    )
 
 
 def check_and_load_submission_data(
@@ -99,21 +58,7 @@ def check_and_load_submission_data(
         )
 
     # Get trajectory files.
-    # For voice submissions the trajectories dir contains experiment
-    # subdirectories (each with its own results.json + simulations/ etc.),
-    # so we look for results.json one level deep to avoid picking up
-    # individual sim files from the simulations/ subdirectory.
-    is_voice = submission.modality == "voice"
-    if is_voice:
-        trajectory_files = sorted(
-            str(f) for f in trajectory_files_dir.glob("*/results.json")
-        )
-        if not trajectory_files:
-            trajectory_files = sorted(
-                str(f) for f in trajectory_files_dir.glob("results.json")
-            )
-    else:
-        trajectory_files = expand_paths([trajectory_files_dir], extension=".json")
+    trajectory_files = expand_paths([trajectory_files_dir], extension=".json")
     results = [TrajectoryResults.load(path) for path in trajectory_files]
 
     submission_data = SubmissionData(
@@ -299,119 +244,10 @@ def validate_submission_metrics(
         console.print("✅ Submission metrics validation successful!", style="green")
 
 
-def _copy_voice_experiment_trimmed(
-    exp_src: Path,
-    exp_dst: Path,
-    results: TrajectoryResults,
-    console: Console,
-) -> int:
-    """Copy a voice experiment directory, keeping only what's needed.
-
-    Saves the results in directory-based format (metadata in ``results.json``,
-    individual simulations in ``simulations/``). If the source is in monolithic
-    JSON format, it is automatically converted. For each task, only the
-    canonical simulation's ``audio/`` subdirectory from ``artifacts/`` is
-    copied.  Skips ``hallucination_discarded/``, ``llm_debug/``,
-    ``sim_status.json``, ``task.log``, and non-canonical simulation
-    directories.
-
-    Args:
-        exp_src: Source experiment directory.
-        exp_dst: Destination directory for the trimmed copy.
-        results: Already-loaded TrajectoryResults (used for task-to-sim
-            mapping and for conversion when source is monolithic JSON).
-        console: Rich console for output.
-
-    Returns the total size in bytes of all copied files.
-    """
-    total_bytes = 0
-    exp_dst.mkdir(parents=True, exist_ok=True)
-
-    # Always save in dir format — converts from monolithic JSON if needed.
-    src_fmt = TrajectoryResults._detect_format(exp_src / "results.json")
-    results.save(exp_dst / "results.json", format="dir")
-
-    if src_fmt != "dir":
-        console.print("    Converted monolithic JSON → dir format", style="dim")
-
-    # Tally written file sizes
-    for f in (exp_dst / "results.json",):
-        total_bytes += f.stat().st_size
-    sims_dst = exp_dst / "simulations"
-    if sims_dst.is_dir():
-        n_sims = 0
-        for f in sims_dst.rglob("*"):
-            if f.is_file():
-                total_bytes += f.stat().st_size
-                n_sims += 1
-        console.print(
-            f"    Wrote simulations/ ({n_sims} file(s))",
-            style="dim",
-        )
-
-    # Build task_id -> sim_id mapping from loaded results
-    task_to_sim: dict[str, str] = {}
-    for sim in results.simulations:
-        task_to_sim[str(sim.task_id)] = sim.id
-
-    artifacts_dir = exp_src / "artifacts"
-    if not artifacts_dir.is_dir():
-        return total_bytes
-
-    copied_audio = 0
-    skipped_sims = 0
-
-    for task_dir in sorted(artifacts_dir.iterdir()):
-        if not task_dir.is_dir() or not task_dir.name.startswith("task_"):
-            continue
-
-        task_id = task_dir.name.split("_", 1)[1]
-        canonical_sim_id = task_to_sim.get(task_id)
-        if canonical_sim_id is None:
-            skipped_sims += sum(1 for d in task_dir.iterdir() if d.is_dir())
-            continue
-
-        canonical_sim_name = f"sim_{canonical_sim_id}"
-        for sim_dir in sorted(task_dir.iterdir()):
-            if not sim_dir.is_dir() or not sim_dir.name.startswith("sim_"):
-                continue
-            if sim_dir.name != canonical_sim_name:
-                skipped_sims += 1
-                continue
-
-            audio_src = sim_dir / "audio"
-            if not audio_src.is_dir():
-                console.print(
-                    f"    ⚠️  Missing audio/ in {task_dir.name}/{sim_dir.name}",
-                    style="yellow",
-                )
-                continue
-
-            audio_dst = exp_dst / "artifacts" / task_dir.name / sim_dir.name / "audio"
-            shutil.copytree(audio_src, audio_dst)
-            for f in audio_dst.rglob("*"):
-                if f.is_file():
-                    total_bytes += f.stat().st_size
-            copied_audio += 1
-
-    if skipped_sims:
-        console.print(
-            f"    Skipped {skipped_sims} non-canonical simulation dir(s)",
-            style="dim",
-        )
-    console.print(
-        f"    Kept audio for {copied_audio} task(s)",
-        style="dim",
-    )
-
-    return total_bytes
-
-
 def prepare_submission(
     input_paths: list[str],
     output_dir: str,
     run_verification: bool = True,
-    voice: Optional[bool] = None,
 ):
     """Prepare the submission for the leaderboard.
 
@@ -419,21 +255,14 @@ def prepare_submission(
     Performs trajectory verification (optional), computes metrics, and creates
     a submission file with interactive user input.
 
-    Supports both text (half-duplex) and voice (audio-native full-duplex)
-    submissions.  Voice mode is auto-detected from the input data when
-    ``voice`` is None.  For voice submissions, only results with "regular"
-    speech complexity are accepted.
-
     Args:
         input_paths: List of paths to trajectory files, directories, or glob
             patterns.
         output_dir: Root directory for the prepared output.
         run_verification: Whether to run trajectory verification before
             processing.
-        voice: If True, force voice submission mode. If False, force text
-            mode.  If None (default), auto-detect from input data.
 
-    Output Structure (text)::
+    Output Structure::
 
         output_dir/
         └── {model}_{org}_{date}/
@@ -441,25 +270,6 @@ def prepare_submission(
             └── trajectories/           # Uploaded to external storage
                 ├── domain1_results.json
                 └── domain2_results.json
-
-    Output Structure (voice)::
-
-        output_dir/
-        └── {model}_{org}_{date}/
-            ├── submission.json
-            └── trajectories/
-                └── <experiment_name>/       # One per domain
-                    ├── results.json         # Metadata only
-                    ├── simulations/         # Individual sim data files
-                    │   ├── sim_0.json
-                    │   └── ...
-                    └── artifacts/           # Canonical audio only
-                        └── task_<id>/
-                            └── sim_<uuid>/
-                                └── audio/
-
-    Voice results are always stored in directory-based format. If the
-    source uses monolithic JSON, it is automatically converted.
 
     The full directory (including trajectories/) is uploaded to external
     storage (S3, Google Drive, etc.).  Only ``submission.json`` is copied
@@ -480,48 +290,11 @@ def prepare_submission(
     # Load all trajectory data upfront
     trajectory_results = [TrajectoryResults.load(path) for path in files]
 
-    # Auto-detect or confirm voice mode
-    is_voice = voice if voice is not None else _detect_voice_mode(trajectory_results)
-    modality: Literal["text", "voice"] = "voice" if is_voice else "text"
-    if is_voice:
-        console.print(
-            "🎙️  Voice submission detected (audio-native mode)", style="bold magenta"
-        )
-    else:
-        console.print("📝 Text submission detected", style="bold blue")
+    modality: Literal["text", "voice"] = "text"
+    console.print("📝 Text submission", style="bold blue")
 
-    # For voice submissions, filter to "regular" complexity only
-    if is_voice:
-        regular_results = [
-            r for r in trajectory_results if r.info.speech_complexity == "regular"
-        ]
-        non_regular = [
-            r for r in trajectory_results if r.info.speech_complexity != "regular"
-        ]
-        if non_regular:
-            skipped_complexities = {r.info.speech_complexity for r in non_regular}
-            console.print(
-                f"  ⚠️  Skipping {len(non_regular)} result file(s) with "
-                f"non-regular complexity: {skipped_complexities}",
-                style="yellow",
-            )
-        if not regular_results:
-            console.print(
-                "❌ No results with 'regular' speech complexity found. "
-                "Voice submissions require 'regular' complexity results.",
-                style="red",
-            )
-            return
-        trajectory_results = regular_results
-        # Update files list to match filtered results (for downstream steps)
-        regular_files = []
-        for f_path, r in zip(files, [TrajectoryResults.load(p) for p in files]):
-            if r.info.speech_complexity == "regular":
-                regular_files.append(f_path)
-        files = regular_files
-
-    # Step 1: Verify trajectories if requested (text only)
-    if run_verification and not is_voice:
+    # Step 1: Verify trajectories if requested
+    if run_verification:
         console.print("🔍 Running trajectory verification...", style="bold blue")
         try:
             verify_trajectories(paths=files, mode=VerificationMode.PUBLIC)
@@ -547,10 +320,8 @@ def prepare_submission(
     console.print("\n📊 Computing metrics...", style="bold blue")
     domain_metrics: dict[str, AgentMetrics] = {}
     domain_results: dict[str, DomainResults] = {}
-    interaction_domain_metrics: dict[str, dict] = {}
     default_model = None
     default_user_simulator = None
-    voice_config: Optional[VoiceConfig] = None
     trajectory_files_map = {}  # domain -> filename for submission.json
 
     for results, file_path in zip(trajectory_results, files):
@@ -566,10 +337,6 @@ def prepare_submission(
                 )
                 return
 
-            # Extract voice config from the first voice result
-            if is_voice and voice_config is None:
-                voice_config = _extract_voice_config(results)
-
             # Track trajectory references by domain.
             # Populated with final filenames/paths during the copy step below.
             trajectory_files_map[domain] = file_path
@@ -577,12 +344,6 @@ def prepare_submission(
             # Compute metrics for this trajectory file
             metrics = compute_metrics(results)
             domain_metrics[domain] = metrics
-
-            # Compute voice interaction metrics from the tick-level data
-            if is_voice:
-                interaction_domain_metrics[domain] = compute_metrics_for_loaded_results(
-                    results
-                )
 
             # Create DomainResults object
             def _pct(val: float | None) -> float | None:
@@ -622,22 +383,11 @@ def prepare_submission(
     # Step 4: Create submission object and gather user input
     console.print("\n📝 Creating submission...", style="bold blue")
 
-    # For voice, derive a better default model name from voice_config
-    default_model_display = default_model
-    if is_voice and voice_config:
-        default_model_display = voice_config.model
-
     # Gather required information
-    model_name = Prompt.ask("Enter model name", default=default_model_display)
-    if is_voice:
-        user_simulator = Prompt.ask(
-            "Enter voice user simulator version (see git tags voice-user-sim-*)",
-            default=VOICE_USER_SIMULATOR_VERSION,
-        )
-    else:
-        user_simulator = Prompt.ask(
-            "Enter user simulator model", default=default_user_simulator
-        )
+    model_name = Prompt.ask("Enter model name", default=default_model)
+    user_simulator = Prompt.ask(
+        "Enter user simulator model", default=default_user_simulator
+    )
     model_organization = Prompt.ask(
         "Enter model organization (who developed the model)",
         default="My-Organization",
@@ -834,42 +584,20 @@ def prepare_submission(
     for r in trajectory_results:
         domain_to_results[r.info.environment_info.domain_name] = r
 
-    if is_voice:
-        # Voice: copy the trimmed experiment directory per domain
-        # (results data + canonical simulation audio only).
-        for domain, src_path in domain_source_paths.items():
-            exp_src = Path(src_path).parent
-            exp_name = exp_src.name
-            exp_dst = trajectories_dir / exp_name
-            console.print(f"  📂 {TRAJECTORY_FILES_DIR_NAME}/{exp_name}/", style="bold")
-            total_bytes = _copy_voice_experiment_trimmed(
-                exp_src, exp_dst, domain_to_results[domain], console
-            )
-            console.print(f"    Total: {total_bytes / 1e6:.1f} MB")
-            trajectory_files_map[domain] = exp_name
-    else:
-        # Text: copy results files, using {domain}_results.json to avoid
-        # collisions when multiple domains share the same filename.
-        for domain, src_path in domain_source_paths.items():
-            src = Path(src_path)
-            dest_name = (
-                src.name if src.name != "results.json" else f"{domain}_results.json"
-            )
-            dest_path = trajectories_dir / dest_name
-            shutil.copy2(src, dest_path)
-            size_mb = dest_path.stat().st_size / 1e6
-            console.print(
-                f"  📂 {TRAJECTORY_FILES_DIR_NAME}/{dest_name} ({size_mb:.1f} MB)"
-            )
-            trajectory_files_map[domain] = dest_name
+    # Copy results files, using {domain}_results.json to avoid collisions
+    # when multiple domains share the same filename.
+    for domain, src_path in domain_source_paths.items():
+        src = Path(src_path)
+        dest_name = src.name if src.name != "results.json" else f"{domain}_results.json"
+        dest_path = trajectories_dir / dest_name
+        shutil.copy2(src, dest_path)
+        size_mb = dest_path.stat().st_size / 1e6
+        console.print(
+            f"  📂 {TRAJECTORY_FILES_DIR_NAME}/{dest_name} ({size_mb:.1f} MB)"
+        )
+        trajectory_files_map[domain] = dest_name
 
     # Step 7: Write submission.json (after copy so trajectory_files_map is final)
-    interaction_metrics = None
-    if interaction_domain_metrics:
-        interaction_metrics = InteractionMetrics.model_validate(
-            build_interaction_metrics_block(interaction_domain_metrics)
-        )
-
     submission = Submission(
         model_name=model_name,
         model_organization=model_organization,
@@ -884,8 +612,6 @@ def prepare_submission(
         trajectory_files=trajectory_files_map if trajectory_files_map else None,
         references=references if references else None,
         methodology=methodology,
-        voice_config=voice_config,
-        interaction_metrics=interaction_metrics,
         reasoning_effort=reasoning_effort,
         model_release=model_release,
     )
@@ -911,16 +637,7 @@ def prepare_submission(
                 pass_scores.append(f"Pass^{k}: {score:.1f}%")
         console.print(" | ".join(pass_scores) if pass_scores else "No scores available")
 
-    if is_voice and voice_config:
-        console.print(f"\n🎙️  Voice config:", style="bold")
-        console.print(f"  Provider: {voice_config.provider}")
-        console.print(f"  Model: {voice_config.model}")
-        if voice_config.tick_duration_seconds:
-            console.print(f"  Tick duration: {voice_config.tick_duration_seconds}s")
-        if voice_config.user_tts_provider:
-            console.print(f"  User TTS: {voice_config.user_tts_provider}")
-
-    manifest_array = "voice_submissions" if is_voice else "submissions"
+    manifest_array = "submissions"
     console.print(f"\n💡 Next steps:", style="bold blue")
     console.print(f"  1. Review {submission_dir_name}/{SUBMISSION_FILE_NAME}")
     console.print(

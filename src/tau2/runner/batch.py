@@ -2,7 +2,7 @@
 Layer 3: Batch runner.
 
 Orchestrates batch execution with concurrency, checkpointing, retries,
-logging, and optional side effects (auto-review, audio saving).
+logging, and optional side effects (auto-review).
 
 Uses Layer 2 (build) to construct instances and Layer 1 (simulation) to
 execute them.
@@ -24,22 +24,17 @@ from typing import Callable, Optional
 
 from loguru import logger
 
-from tau2.data_model.persona import InterruptTendency, PersonaConfig, Verbosity
+from tau2.data_model.persona import PersonaConfig
 from tau2.data_model.simulation import (
-    AudioNativeConfig,
     Info,
     Results,
     RunConfig,
     SimulationRun,
     TextRunConfig,
     UserInfo,
-    VoiceRunConfig,
 )
 from tau2.data_model.tasks import Task
-from tau2.data_model.voice import SynthesisConfig, VoiceSettings
-from tau2.data_model.voice_personas import warn_if_non_official_voices
 from tau2.evaluator.evaluator import EvaluationType
-from tau2.evaluator.reviewer import check_hallucination, format_hallucination_feedback
 from tau2.metrics.agent_metrics import compute_metrics
 from tau2.registry import registry
 from tau2.runner.build import _build_env_kwargs, build_orchestrator
@@ -51,11 +46,7 @@ from tau2.runner.helpers import get_info, get_tasks, make_run_name
 from tau2.runner.progress import StatusMonitor, run_with_retry
 from tau2.runner.simulation import run_simulation
 from tau2.runner.work import WorkQueue, WorkUnit, make_unit_id
-from tau2.user.user_simulator import (
-    get_global_user_sim_guidelines,
-    get_global_user_sim_guidelines_voice,
-)
-from tau2.user_simulation_voice_presets import COMPLEXITY_CONFIGS
+from tau2.user.user_simulator import get_global_user_sim_guidelines
 from tau2.utils.display import ConsoleDisplay, Text
 from tau2.utils.llm_utils import llm_log_mode, set_llm_log_dir, set_llm_log_mode
 from tau2.utils.utils import DATA_DIR
@@ -140,9 +131,7 @@ def run_auto_review(
     llm_user: Optional[str],
     llm_args_user: Optional[dict],
     user_persona_config: Optional[PersonaConfig],
-    user_voice_settings: Optional[VoiceSettings],
     policy: str,
-    is_audio_native: bool,
 ) -> None:
     """Run LLM conversation review on a simulation and attach results.
 
@@ -155,26 +144,18 @@ def run_auto_review(
         llm_user: LLM used by user simulator.
         llm_args_user: LLM args for user simulator.
         user_persona_config: Persona config for user.
-        user_voice_settings: Voice settings for user.
         policy: Environment policy string.
-        is_audio_native: Whether audio-native mode was used.
     """
     from tau2.evaluator.reviewer import ReviewMode, review_simulation
 
     review_mode_enum = ReviewMode.FULL if review_mode == "full" else ReviewMode.USER
 
-    if is_audio_native:
-        review_guidelines = get_global_user_sim_guidelines_voice()
-    else:
-        review_guidelines = get_global_user_sim_guidelines()
-
     review_user_info = UserInfo(
         implementation=user,
         llm=llm_user,
         llm_args=llm_args_user,
-        global_simulation_guidelines=review_guidelines,
+        global_simulation_guidelines=get_global_user_sim_guidelines(),
         persona_config=user_persona_config,
-        voice_settings=user_voice_settings,
     )
 
     logger.info(f"Starting review for task {task.id} (mode: {review_mode})...")
@@ -185,7 +166,6 @@ def run_auto_review(
         mode=review_mode_enum,
         user_info=review_user_info,
         policy=policy,
-        interruption_enabled=is_audio_native,
         review_model=review_model,
     )
 
@@ -198,61 +178,6 @@ def run_auto_review(
     logger.info(
         f"Review completed for task {task.id}: has_errors={review_result.has_errors}"
     )
-
-
-def save_simulation_audio(
-    simulation: SimulationRun,
-    task: Task,
-    simulation_id: str,
-    save_dir: Path,
-    audio_native_config: AudioNativeConfig,
-    audio_debug: bool = False,
-) -> None:
-    """Save audio files for an audio-native simulation.
-
-    Args:
-        simulation: The completed simulation.
-        task: The task specification.
-        simulation_id: Unique simulation ID.
-        save_dir: Base directory for saving files.
-        audio_native_config: Audio-native configuration.
-        audio_debug: Whether to generate debug audio analysis.
-    """
-    task_audio_dir = (
-        save_dir / "artifacts" / f"task_{task.id}" / f"sim_{simulation_id}" / "audio"
-    )
-    task_audio_dir.mkdir(parents=True, exist_ok=True)
-
-    if audio_debug:
-        try:
-            from tau2.voice.utils.audio_debug import generate_audio_debug_info
-
-            debug_dir = task_audio_dir / "debug"
-            report = generate_audio_debug_info(
-                simulation,
-                debug_dir,
-                save_per_tick_audio_files=True,
-                save_silence=True,
-                tick_duration_ms=audio_native_config.tick_duration_ms,
-            )
-            logger.info(
-                f"Audio debug info saved to: {debug_dir} "
-                f"(agent: {report.agent_ticks_with_audio}, user: {report.user_ticks_with_audio} ticks)"
-            )
-            if report.warnings:
-                logger.warning(
-                    f"Audio analysis found {len(report.warnings)} warning(s)"
-                )
-        except Exception as e:
-            logger.warning(f"Failed to generate audio debug info: {e}")
-
-    try:
-        from tau2.voice.synthesis.conversation_builder import generate_simulation_audio
-
-        generate_simulation_audio(simulation, task_audio_dir)
-        logger.debug(f"Audio saved to: {task_audio_dir}")
-    except Exception as e:
-        logger.warning(f"Failed to save audio for task {task.id}: {e}")
 
 
 # =============================================================================
@@ -348,15 +273,11 @@ def run_single_task(
     seed: Optional[int] = None,
     evaluation_type: EvaluationType = EvaluationType.ALL,
     save_dir: Optional[Path] = None,
-    user_voice_settings: Optional[VoiceSettings] = None,
     user_persona_config: Optional[PersonaConfig] = None,
     verbose_logs: bool = False,
-    audio_debug: bool = False,
-    audio_taps: bool = False,
     auto_review: bool = False,
     review_mode: str = "full",
     review_model: Optional[str] = None,
-    hallucination_feedback: Optional[str] = None,
 ) -> SimulationRun:
     """Run a single task simulation with logging and optional side effects.
 
@@ -364,7 +285,7 @@ def run_single_task(
     1. Sets up per-task logging.
     2. Builds an orchestrator via Layer 2 (build_orchestrator).
     3. Runs the simulation via Layer 1 (run_simulation).
-    4. Optionally runs auto-review and saves audio.
+    4. Optionally runs auto-review.
     5. Cleans up logging.
 
     Args:
@@ -372,11 +293,9 @@ def run_single_task(
         task: The task to run.
         seed: Random seed for this trial.
         evaluation_type: Evaluation type to use.
-        save_dir: Directory for saving logs and audio.
-        user_voice_settings: Pre-computed voice settings (run-level).
+        save_dir: Directory for saving logs.
         user_persona_config: Pre-computed persona config (run-level).
         verbose_logs: Enable per-task log files.
-        audio_debug: Enable audio debug analysis.
         auto_review: Run LLM conversation review after simulation.
         review_mode: Review mode ("full" or "user").
         review_model: LLM model to use for review and auth classification.
@@ -385,7 +304,6 @@ def run_single_task(
         The completed SimulationRun with reward_info attached.
     """
     simulation_id = str(uuid.uuid4())
-    is_voice = isinstance(config, VoiceRunConfig)
 
     logger.info(
         f"STARTING SIMULATION: Domain: {config.domain}, Task: {task.id}, "
@@ -393,28 +311,13 @@ def run_single_task(
     )
 
     with _TaskLogContext(simulation_id, save_dir, task, verbose_logs):
-        # Compute audio taps directory if enabled
-        taps_dir = None
-        if audio_taps and save_dir:
-            taps_dir = (
-                save_dir
-                / "artifacts"
-                / f"task_{task.id}"
-                / f"sim_{simulation_id}"
-                / "audio"
-                / "taps"
-            )
-
         # Layer 2: Build the orchestrator
         orchestrator = build_orchestrator(
             config,
             task,
             seed=seed,
             simulation_id=simulation_id,
-            user_voice_settings=user_voice_settings,
             user_persona_config=user_persona_config,
-            hallucination_feedback=hallucination_feedback,
-            audio_taps_dir=taps_dir,
         )
 
         # Layer 1: Run the simulation
@@ -434,19 +337,7 @@ def run_single_task(
                 llm_user=config.llm_user,
                 llm_args_user=config.llm_args_user,
                 user_persona_config=user_persona_config,
-                user_voice_settings=user_voice_settings,
                 policy=orchestrator.environment.get_policy(),
-                is_audio_native=is_voice,
-            )
-
-        if is_voice and save_dir:
-            save_simulation_audio(
-                simulation=simulation,
-                task=task,
-                simulation_id=simulation_id,
-                save_dir=save_dir,
-                audio_native_config=config.audio_native_config,
-                audio_debug=audio_debug,
             )
 
         logger.info(
@@ -475,7 +366,6 @@ class _BatchContext:
     config: RunConfig
     evaluation_type: EvaluationType
     save_dir: Optional[Path]
-    user_voice_settings: Optional[VoiceSettings]
     user_persona_config: Optional[PersonaConfig]
     info: Info
     console_display: bool = True
@@ -486,30 +376,10 @@ class _BatchContext:
     llm_log_mode_value: Optional[str] = None
 
 
-def make_voice_run_settings(
-    config: RunConfig,
-) -> tuple[Optional[VoiceSettings], Optional[PersonaConfig]]:
-    """Run-level voice settings and persona config, derived deterministically
-    from the config (so a worker process re-derives the same values)."""
-    if not isinstance(config, VoiceRunConfig):
-        return None, None
-    user_voice_settings = VoiceSettings(
-        transcription_config=None,
-        synthesis_config=SynthesisConfig(),
-    )
-    complexity_config = COMPLEXITY_CONFIGS[config.speech_complexity]
-    user_persona_config = PersonaConfig(
-        verbosity=Verbosity(complexity_config["verbosity"]),
-        interrupt_tendency=InterruptTendency(complexity_config["interrupt_tendency"]),
-    )
-    return user_voice_settings, user_persona_config
-
-
 def unit_provider(config: RunConfig) -> Optional[str]:
     """The resource a unit consumes, for per-provider lease caps.
 
-    Voice runs report the audio-native provider; text runs fall back to the
-    litellm prefix of the agent model when one is present.
+    Falls back to the litellm prefix of the agent model when one is present.
     """
     provider = config.effective_agent_provider
     if provider:
@@ -523,11 +393,9 @@ def unit_provider(config: RunConfig) -> Optional[str]:
 def run_unit(
     ctx: _BatchContext, task: Task, trial: int, seed: int, progress_str: str = ""
 ) -> SimulationRun:
-    """Execute one work unit: a single task/trial with retry and hallucination
-    retry. This is the code a worker process runs; the local loop runs it too."""
+    """Execute one work unit: a single task/trial with retry. This is the code
+    a worker process runs; the local loop runs it too."""
     config = ctx.config
-    is_voice = isinstance(config, VoiceRunConfig)
-    hallucination_retries = config.hallucination_retries
     save_dir = ctx.save_dir
     monitor = ctx.monitor
 
@@ -549,25 +417,18 @@ def run_unit(
     )
     ConsoleDisplay.console.print(console_text)
 
-    def _execute(
-        run_seed: int = seed,
-        hallucination_feedback: Optional[str] = None,
-    ):
+    def _execute(run_seed: int = seed):
         return run_single_task(
             config,
             task,
             seed=run_seed,
             evaluation_type=ctx.evaluation_type,
             save_dir=save_dir,
-            user_voice_settings=ctx.user_voice_settings,
             user_persona_config=ctx.user_persona_config,
             verbose_logs=config.verbose_logs,
-            audio_debug=config.audio_debug if is_voice else False,
-            audio_taps=config.audio_taps if is_voice else False,
             auto_review=config.auto_review,
             review_mode=config.review_mode,
             review_model=config.review_model,
-            hallucination_feedback=hallucination_feedback,
         )
 
     try:
@@ -583,97 +444,6 @@ def run_unit(
             on_retry=(lambda: monitor.task_restarted(task_key)) if monitor else None,
             shutdown_event=ctx.shutdown_event,
         )
-
-        # Hallucination retry: if check detects fabricated info, re-run
-        is_full_duplex = result.ticks is not None and len(result.ticks) > 0
-        if hallucination_retries > 0 and is_full_duplex:
-            hallucination_retry_count = 0
-            while hallucination_retry_count < hallucination_retries:
-                h_check = check_hallucination(result, task)
-                result.hallucination_check = h_check
-
-                if not h_check.hallucination_found:
-                    break
-
-                hallucination_retry_count += 1
-                n_errors = len(h_check.errors)
-
-                retry_text = Text(
-                    text=f"  Hallucination detected on task {task.id} ({n_errors} instance(s)). "
-                    f"Re-running with feedback ({hallucination_retry_count}/{hallucination_retries})...",
-                    style="yellow",
-                )
-                ConsoleDisplay.console.print(retry_text)
-
-                # Save discarded run
-                if save_dir is not None:
-                    discarded_dir = save_dir / "hallucination_discarded"
-                    discarded_dir.mkdir(parents=True, exist_ok=True)
-                    discarded_path = discarded_dir / "results_user_hallucination.json"
-
-                    if discarded_path.exists():
-                        with open(discarded_path, "r") as fp:
-                            discarded_data = json.load(fp)
-                        discarded_data["simulations"].append(
-                            result.model_dump(mode="json")
-                        )
-                        existing_task_ids = {t["id"] for t in discarded_data["tasks"]}
-                        if task.id not in existing_task_ids:
-                            discarded_data["tasks"].append(task.model_dump(mode="json"))
-                        with open(discarded_path, "w") as fp:
-                            json.dump(discarded_data, fp, indent=2)
-                    else:
-                        discarded_results = Results(
-                            info=ctx.info,
-                            tasks=[task],
-                            simulations=[result],
-                        )
-                        with open(discarded_path, "w") as fp:
-                            fp.write(discarded_results.model_dump_json(indent=2))
-
-                    logger.info(
-                        f"Saved discarded hallucination run to {discarded_path} "
-                        f"(task {task.id}, retry {hallucination_retry_count})"
-                    )
-
-                # Mark the discarded sim directory
-                if save_dir is not None:
-                    sim_dir = (
-                        save_dir / "artifacts" / f"task_{task.id}" / f"sim_{result.id}"
-                    )
-                    if sim_dir.exists():
-                        try:
-                            status = {
-                                "status": "discarded",
-                                "reason": "user_hallucination",
-                                "hallucination_errors": n_errors,
-                            }
-                            status_path = sim_dir / "sim_status.json"
-                            with open(status_path, "w") as f:
-                                json.dump(status, f, indent=2)
-                        except Exception:
-                            pass
-
-                # Build feedback and re-run
-                if monitor:
-                    monitor.task_restarted(task_key)
-                feedback = format_hallucination_feedback(h_check)
-                retry_seed = seed + hallucination_retry_count * 1000
-                result = _execute(
-                    run_seed=retry_seed,
-                    hallucination_feedback=feedback,
-                )
-                result.trial = trial
-
-            result.hallucination_retries_used = hallucination_retry_count
-
-            if hallucination_retry_count > 0:
-                # Replace the eagerly-saved hallucinated result in the
-                # checkpoint with the clean retry.  Use the original seed
-                # so resume matching stays consistent.
-                result.seed = seed
-                if ctx.replace_fn:
-                    ctx.replace_fn((trial, task.id, seed), result)
 
         # Mark the final sim as the one used in results
         if save_dir is not None:
@@ -707,7 +477,6 @@ class BatchPrep:
     units: list[WorkUnit]
     save_fn: Optional[Callable]
     replace_fn: Optional[Callable]
-    user_voice_settings: Optional[VoiceSettings]
     user_persona_config: Optional[PersonaConfig]
     save_dir: Optional[Path]
     evaluation_type: EvaluationType
@@ -758,8 +527,7 @@ def prepare_batch(
 
     lock = multiprocessing.Lock()
 
-    # Create run-level voice settings and persona config for voice mode
-    user_voice_settings, user_persona_config = make_voice_run_settings(config)
+    user_persona_config = None
 
     # Warm knowledge base cache for banking_knowledge domain
     policy_override = None
@@ -790,7 +558,6 @@ def prepare_batch(
     info = get_info(
         config,
         user_persona_config=user_persona_config,
-        user_voice_settings=user_voice_settings,
         policy_override=policy_override,
     )
     simulation_results = Results(
@@ -849,25 +616,12 @@ def prepare_batch(
         units=units,
         save_fn=save_fn,
         replace_fn=replace_fn,
-        user_voice_settings=user_voice_settings,
         user_persona_config=user_persona_config,
         save_dir=save_dir,
         evaluation_type=evaluation_type,
         console_display=console_display,
         run_id=run_id,
     )
-
-
-def preregister_voice_plugins(config: RunConfig) -> None:
-    """Pre-register LiveKit plugins on the main thread before sim threads spawn."""
-    if (
-        isinstance(config, VoiceRunConfig)
-        and config.audio_native_config is not None
-        and config.audio_native_config.provider == "livekit"
-    ):
-        from tau2.voice.audio_native.livekit import preregister_livekit_plugins
-
-        preregister_livekit_plugins()
 
 
 # =============================================================================
@@ -889,7 +643,6 @@ def run_tasks(
 
     This is the main batch execution function. It handles:
     - Seed management and trial repetition
-    - Voice/persona config setup for audio-native mode
     - Checkpoint save/resume
     - Concurrent execution via thread pool
     - Progress monitoring
@@ -900,7 +653,7 @@ def run_tasks(
             num_trials, max_concurrency, retry settings, etc.).
         tasks: The tasks to run.
         save_path: Path to the results JSON file. If None, results are not persisted.
-        save_dir: Directory for saving logs, audio, etc. If None, derived from save_path.
+        save_dir: Directory for saving logs, etc. If None, derived from save_path.
         evaluation_type: Evaluation type to use for all simulations.
         console_display: Whether to show console output for each simulation.
 
@@ -957,16 +710,12 @@ def run_tasks(
         )
         return simulation_results
 
-    # Pre-register LiveKit plugins on main thread before sim threads spawn
-    preregister_voice_plugins(config)
-
     shutdown_event = threading.Event()
 
     ctx = _BatchContext(
         config=config,
         evaluation_type=evaluation_type,
         save_dir=save_dir,
-        user_voice_settings=prep.user_voice_settings,
         user_persona_config=prep.user_persona_config,
         info=simulation_results.info,
         console_display=console_display,
@@ -1077,16 +826,11 @@ def _load_run_tasks(config: RunConfig) -> list[Task]:
 
 
 def _run_save_paths(config: RunConfig) -> tuple[str, Path, Path, str]:
-    """(run_name, save_dir, save_path, results_format) for a config.
-
-    Voice runs use directory format (individual sim files) because voice
-    simulations with tick data are very large; text runs use monolithic JSON.
-    """
+    """(run_name, save_dir, save_path, results_format) for a config."""
     run_name = config.save_to or make_run_name(config)
     save_dir = DATA_DIR / "simulations" / run_name
     save_path = save_dir / "results.json"
-    results_format = "dir" if isinstance(config, VoiceRunConfig) else "json"
-    return run_name, save_dir, save_path, results_format
+    return run_name, save_dir, save_path, "json"
 
 
 def run_domain(config: RunConfig) -> Results:
@@ -1107,9 +851,6 @@ def run_domain(config: RunConfig) -> Results:
     """
     config.validate()
     ConsoleDisplay.display_run_config(config)
-
-    if isinstance(config, VoiceRunConfig):
-        warn_if_non_official_voices()
 
     tasks = _load_run_tasks(config)
     _, save_dir, save_path, results_format = _run_save_paths(config)
@@ -1158,8 +899,6 @@ def run_domains(
     for config in configs:
         config.validate()
         ConsoleDisplay.display_run_config(config)
-        if isinstance(config, VoiceRunConfig):
-            warn_if_non_official_voices()
         tasks = _load_run_tasks(config)
         run_name, save_dir, save_path, results_format = _run_save_paths(config)
         preps.append(

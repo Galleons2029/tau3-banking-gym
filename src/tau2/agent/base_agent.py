@@ -1,22 +1,15 @@
 """
 Base agent classes.
 
-This module defines agent-specific base classes for both protocols:
-- HalfDuplexAgent: For turn-based agents (uses generate_next_message)
-- FullDuplexAgent: For streaming agents (uses get_next_chunk)
+HalfDuplexAgent: base class for turn-based agents (uses generate_next_message).
 """
 
 from abc import ABC
 from typing import Generic, Optional, TypeVar
 
-from tau2.agent.base.participant import (
-    FullDuplexParticipant,
-    HalfDuplexParticipant,
-    VoiceParticipantMixin,
-)
+from tau2.agent.base.participant import HalfDuplexParticipant
 from tau2.data_model.message import (
     AssistantMessage,
-    EnvironmentMessage,
     Message,
     MultiToolMessage,
     ToolMessage,
@@ -84,79 +77,6 @@ class HalfDuplexAgent(
             state: The agent state.
         """
         pass
-
-
-# =============================================================================
-# FULL-DUPLEX AGENTS
-# =============================================================================
-
-
-class FullDuplexAgent(
-    FullDuplexParticipant[UserMessage, AssistantMessage, AgentState],
-    ABC,
-    Generic[AgentState],
-):
-    """
-    Base class for full-duplex (streaming) agents.
-
-    Streaming agents use get_next_chunk() for continuous communication.
-    They do NOT implement generate_next_message().
-
-    Agent developers must implement:
-    - get_next_chunk: Process incoming chunks and generate outgoing chunks
-    - get_init_state: Get the initial state of the agent
-    """
-
-    def __init__(self, tools: list[Tool], domain_policy: str):
-        super().__init__()
-        self.tools = tools
-        self.domain_policy = domain_policy
-
-    def stop(
-        self,
-        participant_chunk: Optional[Message] = None,
-        state: Optional[AgentState] = None,
-        tool_results: Optional[EnvironmentMessage] = None,
-    ) -> None:
-        """
-        Stops the agent.
-        Args:
-            participant_chunk: The last chunk from the user.
-            state: The agent state.
-            tool_results: Any pending tool results not yet delivered.
-        """
-        pass
-
-
-# =============================================================================
-# VOICE AGENTS (can be used with either protocol)
-# =============================================================================
-
-
-class HalfDuplexVoiceAgent(
-    VoiceParticipantMixin[ValidAgentInputMessage, AssistantMessage],
-    HalfDuplexAgent[AgentState],
-    ABC,
-    Generic[AgentState],
-):
-    """
-    Base class for half-duplex agents that support voice communication.
-    """
-
-    pass
-
-
-class FullDuplexVoiceAgent(
-    VoiceParticipantMixin[UserMessage, AssistantMessage],
-    FullDuplexAgent[AgentState],
-    ABC,
-    Generic[AgentState],
-):
-    """
-    Base class for full-duplex agents that support voice communication.
-    """
-
-    pass
 
 
 # =============================================================================

@@ -41,67 +41,25 @@ tau2 run \
 | `--seed` | Random seed for reproducibility (default: `300`) |
 | `--save-to` | Custom output directory name (saved under `data/simulations/`) |
 | `--log-level` | Log level (default: `ERROR`) |
-| `--verbose-logs` | Save detailed logs (LLM calls, audio, ticks) |
-| `--audio-debug` | Save per-tick audio files and timing analysis (requires `--audio-native`) |
+| `--verbose-logs` | Save detailed logs (LLM calls, per-task logs) |
 | `--llm-log-mode` | LLM log mode when `--verbose-logs` is on: `all` or `latest` (default: `latest`) |
 | `--max-retries` | Max retries for failed tasks (default: `3`) |
 | `--retry-delay` | Delay in seconds between retries (default: `1.0`) |
 | `--enforce-communication-protocol` | Enforce protocol rules (e.g. no mixed text + tool call messages) |
 | `--user-persona` | User persona config as JSON dict |
-| `--xml-prompt` | Force XML tags in system prompt |
-| `--no-xml-prompt` | Force plain text system prompt (no XML tags) |
 | `--auto-resume` | Automatically resume from existing save file without prompting |
 | `--auto-review` | Automatically run LLM conversation review after each simulation |
 | `--review-mode` | Review mode when `--auto-review` is on: `full` or `user` (default: `full`) |
 | `--review-model` | LLM model to use for review calls (default: `claude-opus-4-5`) |
-| `--hallucination-retries` | Max retries when user simulator hallucination is detected (full-duplex only, default: `3`). Set to `0` to disable |
 | `--timeout` | Maximum wallclock time in seconds per simulation (no timeout by default) |
-| `--audio-native` | Enable audio native mode (voice full-duplex) |
-| `--audio-taps` | Save WAV files at each pipeline stage for debugging (requires `--audio-native`) |
 | `--retrieval-config` | Retrieval configuration for `banking_knowledge` domain (e.g., `alltools`, `bm25`, `terminal_use`) |
 | `--retrieval-config-kwargs` | JSON arguments for the retrieval config constructor (e.g., `'{"top_k": 10}'`) |
-
-### Audio Native Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--audio-native` | `false` | Enable audio native mode |
-| `--audio-native-provider` | `openai` | Provider: `openai`, `gemini`, `xai` |
-| `--audio-native-model` | *(per-provider)* | Model to use (defaults to provider-specific model if not set) |
-| `--tick-duration` | `0.2` | Tick duration in seconds (simulation timestep) |
-| `--max-steps-seconds` | `600` | Maximum conversation duration in seconds |
-| `--speech-complexity` | `regular` | Speech complexity: `control`, `regular`, or ablation variants (`control_audio`, `control_accents`, `control_behavior`, `control_audio_accents`, `control_audio_behavior`, `control_accents_behavior`) |
-| `--pcm-sample-rate` | `16000` | User simulator PCM synthesis rate |
-| `--telephony-rate` | `8000` | API/agent telephony rate |
-
-**Turn-taking thresholds:**
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--wait-to-respond-other` | `1.0` | Min seconds since agent spoke before user responds |
-| `--wait-to-respond-self` | `5.0` | Min seconds since user spoke before responding again |
-| `--yield-when-interrupted` | `1.0` | How long user keeps speaking when agent interrupts |
-| `--yield-when-interrupting` | `5.0` | How long user keeps speaking when interrupting agent |
-| `--interruption-check-interval` | `2.0` | Interval for checking interruptions |
-| `--integration-duration` | `0.5` | Integration duration for linearization |
-| `--silence-annotation-threshold` | `4.0` | Silence threshold for annotations |
 
 ### Examples
 
 ```bash
 # Standard text evaluation
 tau2 run --domain airline --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 1 --num-tasks 5
-
-# Audio native (voice full-duplex)
-tau2 run --domain retail --audio-native --num-tasks 1 --verbose-logs
-
-# Audio native with custom provider and settings
-tau2 run --domain retail --audio-native --audio-native-provider gemini \
-  --tick-duration 0.2 --max-steps-seconds 240 --speech-complexity control \
-  --verbose-logs --save-to my_audio_native_run
-
-# Audio native with hallucination retries disabled
-tau2 run --domain retail --audio-native --hallucination-retries 0 --num-tasks 1
 
 # Knowledge retrieval with BM25
 tau2 run --domain banking_knowledge --retrieval-config bm25 \
@@ -148,7 +106,6 @@ tau2 view
 | `--file` | Path to a specific results file to view |
 | `--only-show-failed` | Only show failed tasks |
 | `--only-show-all-failed` | Only show tasks that failed in all trials |
-| `--expanded-ticks` | Show expanded tick view (for full-duplex simulations) |
 
 ---
 
@@ -236,7 +193,7 @@ tau2 convert-results <path> [--to {json,dir}] [--no-backup]
 | `--to` | Target format: `json` (monolithic) or `dir` (directory with individual sim files). If omitted, converts to the opposite of the current format |
 | `--no-backup` | Skip creating a backup before conversion |
 
-Text runs default to monolithic JSON; voice runs default to directory-based format. Use this command to convert between them when needed.
+Runs default to monolithic JSON. Use this command to convert to or from the directory-based format when needed.
 
 ---
 
@@ -264,8 +221,6 @@ See the full [Leaderboard Submission Guide](leaderboard-submission.md).
 # Prepare a submission
 tau2 submit prepare <paths...> --output ./my_submission
 
-# Prepare a voice submission (auto-detected, or force with --voice)
-tau2 submit prepare <paths...> --output ./my_submission --voice
 
 # Skip trajectory verification during preparation
 tau2 submit prepare <paths...> --output ./my_submission --no-verify
@@ -311,7 +266,6 @@ Useful for testing domain tools, debugging environment responses, and exploring 
 
 ```bash
 make test              # Core tests (requires: uv sync --extra dev)
-make test-voice        # Voice + streaming tests (requires: uv sync --extra dev --extra voice)
 make test-knowledge    # Banking knowledge tests (requires: uv sync --extra dev --extra knowledge)
 make test-gym          # Gymnasium tests (requires: uv sync --extra dev --extra gym)
 make test-all          # All tests (requires: uv sync --all-extras)

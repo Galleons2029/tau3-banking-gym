@@ -3,25 +3,13 @@ from collections.abc import Iterator
 from copy import deepcopy
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import Literal, Optional
 
 import pandas as pd
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Annotated
 
-if TYPE_CHECKING:
-    from tau2.voice.audio_native.livekit.config import CascadedConfig
-
 from tau2.config import (
-    DEFAULT_AUDIO_NATIVE_AGENT_IMPLEMENTATION,
-    DEFAULT_AUDIO_NATIVE_MODELS,
-    DEFAULT_AUDIO_NATIVE_PROVIDER,
-    DEFAULT_AUDIO_NATIVE_USER_IMPLEMENTATION,
-    DEFAULT_BACKCHANNEL_MAX_THRESHOLD_SECONDS,
-    DEFAULT_BACKCHANNEL_MIN_THRESHOLD_SECONDS,
-    DEFAULT_BACKCHANNEL_POISSON_RATE,
-    DEFAULT_INTEGRATION_DURATION_SECONDS,
-    DEFAULT_INTERRUPTION_CHECK_INTERVAL_SECONDS,
     DEFAULT_LLM_AGENT,
     DEFAULT_LLM_ARGS_AGENT,
     DEFAULT_LLM_ARGS_USER,
@@ -31,245 +19,26 @@ from tau2.config import (
     DEFAULT_MAX_CONCURRENCY,
     DEFAULT_MAX_ERRORS,
     DEFAULT_MAX_STEPS,
-    DEFAULT_MAX_STEPS_SECONDS,
     DEFAULT_NUM_TRIALS,
-    DEFAULT_PCM_SAMPLE_RATE,
     DEFAULT_RETRY_ATTEMPTS,
     DEFAULT_RETRY_MIN_WAIT,
     DEFAULT_SAVE_TO,
     DEFAULT_SEED,
-    DEFAULT_SEND_AUDIO_INSTANT,
-    DEFAULT_SILENCE_ANNOTATION_THRESHOLD_SECONDS,
-    DEFAULT_TELEPHONY_RATE,
-    DEFAULT_TEXT_STREAMING_CONFIG,
-    DEFAULT_TICK_DURATION_SECONDS,
-    DEFAULT_USE_LLM_BACKCHANNEL,
-    DEFAULT_WAIT_TO_RESPOND_THRESHOLD_OTHER_SECONDS,
-    DEFAULT_WAIT_TO_RESPOND_THRESHOLD_SELF_SECONDS,
-    DEFAULT_YIELD_THRESHOLD_WHEN_INTERRUPTED_SECONDS,
-    DEFAULT_YIELD_THRESHOLD_WHEN_INTERRUPTING_SECONDS,
 )
-from tau2.data_model.audio_effects import EffectTimeline
-from tau2.data_model.message import Message, Tick
+from tau2.data_model.message import Message
 from tau2.data_model.persona import PersonaConfig
 from tau2.data_model.tasks import Action, EnvAssertion, RewardType, Task
-from tau2.data_model.usage import SessionUsage
-from tau2.data_model.voice import SpeechComplexity, SpeechEnvironment, VoiceSettings
 from tau2.environment.environment import EnvironmentInfo
 from tau2.environment.toolkit import ToolType
-from tau2.orchestrator.modes import CommunicationMode
 from tau2.utils.utils import get_now
 
 SIMULATIONS_DIR = "simulations"
 
 
-class AudioNativeConfig(BaseModel):
-    """Configuration for audio-native mode using DiscreteTimeAudioNativeAgent.
-
-    This configuration is used when running full-duplex voice simulations
-    with audio native APIs (OpenAI Realtime or Gemini Live).
-    """
-
-    # Provider selection
-    provider: Literal["openai", "gemini", "xai", "nova", "qwen", "livekit"] = Field(
-        default=DEFAULT_AUDIO_NATIVE_PROVIDER,
-        description="Audio native API provider: 'openai' (OpenAI Realtime), 'gemini' (Gemini Live), 'xai' (xAI Grok Voice Agent), 'nova' (Amazon Nova Sonic), 'qwen' (Alibaba Qwen Omni), or 'livekit' (LiveKit cascaded STT→LLM→TTS)",
-    )
-
-    # Cascaded config (for livekit provider)
-    cascaded_config_name: Optional[str] = Field(
-        default=None,
-        description="Name of cascaded config preset for livekit provider (e.g., 'default', 'openai-thinking', 'openai-thinking-high')",
-    )
-
-    model: str = Field(
-        default=DEFAULT_AUDIO_NATIVE_MODELS[DEFAULT_AUDIO_NATIVE_PROVIDER],
-        description="Audio native model to use",
-    )
-    reasoning_effort: Optional[str] = Field(
-        default=None,
-        description="Reasoning effort for thinking models: 'minimal', 'low', 'medium', 'high'. If None, not sent.",
-    )
-
-    # Timing configuration
-    tick_duration_seconds: float = Field(
-        default=DEFAULT_TICK_DURATION_SECONDS,
-        description="Duration of each tick in seconds (e.g., 0.2 = 200ms)",
-    )
-    max_steps_seconds: int = Field(
-        default=DEFAULT_MAX_STEPS_SECONDS,
-        description="Maximum conversation duration in seconds",
-    )
-
-    # Audio configuration
-    pcm_sample_rate: int = Field(
-        default=DEFAULT_PCM_SAMPLE_RATE,
-        description="User simulator PCM synthesis sample rate",
-    )
-    telephony_rate: int = Field(
-        default=DEFAULT_TELEPHONY_RATE,
-        description="API/agent telephony sample rate (OpenAI Realtime API)",
-    )
-
-    # User simulator turn-taking thresholds (in seconds)
-    wait_to_respond_threshold_other_seconds: float = Field(
-        default=DEFAULT_WAIT_TO_RESPOND_THRESHOLD_OTHER_SECONDS,
-        description="Min time to wait since OTHER (agent) last spoke before responding",
-    )
-    wait_to_respond_threshold_self_seconds: float = Field(
-        default=DEFAULT_WAIT_TO_RESPOND_THRESHOLD_SELF_SECONDS,
-        description="Min time to wait since SELF (user) last spoke before responding",
-    )
-    yield_threshold_when_interrupted_seconds: float = Field(
-        default=DEFAULT_YIELD_THRESHOLD_WHEN_INTERRUPTED_SECONDS,
-        description="How long user keeps speaking when agent interrupts user",
-    )
-    yield_threshold_when_interrupting_seconds: float = Field(
-        default=DEFAULT_YIELD_THRESHOLD_WHEN_INTERRUPTING_SECONDS,
-        description="How long user keeps speaking when user interrupts agent",
-    )
-    interruption_check_interval_seconds: float = Field(
-        default=DEFAULT_INTERRUPTION_CHECK_INTERVAL_SECONDS,
-        description="Interval for checking interruptions",
-    )
-    integration_duration_seconds: float = Field(
-        default=DEFAULT_INTEGRATION_DURATION_SECONDS,
-        description="Integration duration for linearization",
-    )
-    silence_annotation_threshold_seconds: float = Field(
-        default=DEFAULT_SILENCE_ANNOTATION_THRESHOLD_SECONDS,
-        description="Silence threshold for adding annotations to conversation history",
-    )
-    backchannel_min_threshold_seconds: Optional[float] = Field(
-        default=DEFAULT_BACKCHANNEL_MIN_THRESHOLD_SECONDS,
-        description="Backchannel min threshold in seconds (None = disabled). Used with Poisson policy.",
-    )
-    backchannel_max_threshold_seconds: Optional[float] = Field(
-        default=DEFAULT_BACKCHANNEL_MAX_THRESHOLD_SECONDS,
-        description="Backchannel max threshold in seconds - force backchannel after this duration. Used with Poisson policy.",
-    )
-    backchannel_poisson_rate: float = Field(
-        default=DEFAULT_BACKCHANNEL_POISSON_RATE,
-        description="Backchannel Poisson rate (events per second). Used with Poisson policy.",
-    )
-    use_llm_backchannel: bool = Field(
-        default=DEFAULT_USE_LLM_BACKCHANNEL,
-        description="If True, use LLM-based backchannel policy. If False, use Poisson-based policy with min/max thresholds.",
-    )
-
-    # Agent behavior
-    use_xml_prompt: bool = Field(
-        default=False,
-        description="Use XML tags in system prompt. Defaults to False (plain text) for all providers.",
-    )
-    send_audio_instant: bool = Field(
-        default=DEFAULT_SEND_AUDIO_INSTANT,
-        description="If True, send all audio at once per tick. If False (default), stream audio in 20ms chunks at real-time rate.",
-    )
-
-    # Derived properties (computed from seconds and tick_duration)
-    @property
-    def tick_duration_ms(self) -> float:
-        """Tick duration in milliseconds."""
-        return self.tick_duration_seconds * 1000
-
-    @property
-    def user_chunk_size(self) -> int:
-        """User audio chunk size in samples."""
-        return int(self.pcm_sample_rate * self.tick_duration_seconds)
-
-    @property
-    def wait_to_respond_threshold_other_ticks(self) -> int:
-        """Wait to respond threshold (other) in ticks."""
-        return int(
-            self.wait_to_respond_threshold_other_seconds / self.tick_duration_seconds
-        )
-
-    @property
-    def wait_to_respond_threshold_self_ticks(self) -> int:
-        """Wait to respond threshold (self) in ticks."""
-        return int(
-            self.wait_to_respond_threshold_self_seconds / self.tick_duration_seconds
-        )
-
-    @property
-    def yield_threshold_when_interrupted_ticks(self) -> int:
-        """Yield threshold when interrupted (agent interrupts user) in ticks."""
-        return int(
-            self.yield_threshold_when_interrupted_seconds / self.tick_duration_seconds
-        )
-
-    @property
-    def yield_threshold_when_interrupting_ticks(self) -> int:
-        """Yield threshold when interrupting (user interrupts agent) in ticks."""
-        return int(
-            self.yield_threshold_when_interrupting_seconds / self.tick_duration_seconds
-        )
-
-    @property
-    def interruption_check_interval_ticks(self) -> int:
-        """Interruption check interval in ticks."""
-        return int(
-            self.interruption_check_interval_seconds / self.tick_duration_seconds
-        )
-
-    @property
-    def integration_ticks(self) -> int:
-        """Integration ticks for linearization."""
-        return max(
-            1, int(self.integration_duration_seconds / self.tick_duration_seconds)
-        )
-
-    @property
-    def silence_annotation_threshold_ticks(self) -> int:
-        """Silence annotation threshold in ticks."""
-        return int(
-            self.silence_annotation_threshold_seconds / self.tick_duration_seconds
-        )
-
-    @property
-    def backchannel_min_threshold_ticks(self) -> Optional[int]:
-        """Backchannel min threshold in ticks (None if disabled)."""
-        if self.backchannel_min_threshold_seconds is None:
-            return None
-        return int(self.backchannel_min_threshold_seconds / self.tick_duration_seconds)
-
-    @property
-    def backchannel_max_threshold_ticks(self) -> Optional[int]:
-        """Backchannel max threshold in ticks (None if not set)."""
-        if self.backchannel_max_threshold_seconds is None:
-            return None
-        return int(self.backchannel_max_threshold_seconds / self.tick_duration_seconds)
-
-    @property
-    def max_steps_ticks(self) -> int:
-        """Maximum steps in ticks."""
-        return int(self.max_steps_seconds / self.tick_duration_seconds)
-
-    @property
-    def cascaded_config(self) -> Optional["CascadedConfig"]:
-        """Get the CascadedConfig for livekit provider.
-
-        Returns the config from CASCADED_CONFIGS if a name is specified,
-        otherwise returns None (will use defaults).
-        """
-        if self.cascaded_config_name is None:
-            return None
-
-        from tau2.voice.audio_native.livekit.config import CASCADED_CONFIGS
-
-        if self.cascaded_config_name not in CASCADED_CONFIGS:
-            raise ValueError(
-                f"Unknown cascaded config: '{self.cascaded_config_name}'. "
-                f"Available: {list(CASCADED_CONFIGS.keys())}"
-            )
-        return CASCADED_CONFIGS[self.cascaded_config_name]
-
-
 class BaseRunConfig(BaseModel):
-    """Base configuration shared by both text (half-duplex) and voice (full-duplex) modes.
+    """Base configuration for half-duplex (text) simulations.
 
-    Do not instantiate directly. Use TextRunConfig or VoiceRunConfig.
+    Do not instantiate directly. Use TextRunConfig.
     """
 
     # ---- Domain and task selection ----
@@ -397,7 +166,7 @@ class BaseRunConfig(BaseModel):
     verbose_logs: Annotated[
         bool,
         Field(
-            description="Enable verbose logging: saves LLM call logs, audio files, per-task logs, and ticks (for audio-native).",
+            description="Enable verbose logging: saves LLM call logs and per-task logs.",
             default=False,
         ),
     ]
@@ -447,15 +216,6 @@ class BaseRunConfig(BaseModel):
             default=DEFAULT_LLM_EVAL_USER_SIMULATOR,
         ),
     ]
-    hallucination_retries: Annotated[
-        int,
-        Field(
-            description="Maximum number of retries when a user simulator hallucination is detected. "
-            "Set to 0 to disable. "
-            "Each retry re-runs the simulation with a different seed and feedback.",
-            default=3,
-        ),
-    ]
 
     # ---- Misc ----
     is_remote: Annotated[
@@ -503,7 +263,7 @@ class BaseRunConfig(BaseModel):
 
     @property
     def effective_max_steps(self) -> int:
-        """Maximum simulation steps (turns for text, ticks for voice)."""
+        """Maximum simulation steps (conversation turns)."""
         raise NotImplementedError("Subclasses must implement effective_max_steps")
 
     @property
@@ -513,18 +273,13 @@ class BaseRunConfig(BaseModel):
 
     @property
     def effective_agent_provider(self) -> Optional[str]:
-        """The agent provider (e.g., 'openai'). None for text mode."""
+        """The agent provider. Always None for text mode."""
         raise NotImplementedError("Subclasses must implement effective_agent_provider")
 
     @property
     def effective_user_model(self) -> str:
         """The user model identifier. Always llm_user."""
         return self.llm_user
-
-    @property
-    def is_voice(self) -> bool:
-        """Whether this is a voice (full-duplex) configuration."""
-        return isinstance(self, VoiceRunConfig)
 
     def validate(self) -> None:
         """Validate the run config."""
@@ -585,14 +340,6 @@ class TextRunConfig(BaseRunConfig):
             default=False,
         ),
     ]
-    text_streaming_config: Annotated[
-        Optional[dict],
-        Field(
-            description="Text streaming configuration",
-            default=None,
-        ),
-    ]
-
     # ---- Properties ----
 
     @property
@@ -616,84 +363,8 @@ class TextRunConfig(BaseRunConfig):
         return None
 
 
-class VoiceRunConfig(BaseRunConfig):
-    """Configuration for full-duplex (voice/audio-native) simulations.
-
-    Voice mode uses real-time audio exchange between a discrete-time audio-native
-    agent and a voice streaming user simulator, with a FullDuplexOrchestrator
-    managing the tick-based simulation.
-    """
-
-    # ---- Audio-native config (required) ----
-    audio_native_config: Annotated[
-        AudioNativeConfig,
-        Field(
-            description="Configuration for audio-native mode (provider, model, timing, thresholds, etc.).",
-        ),
-    ]
-
-    # ---- Voice-specific ----
-    speech_complexity: Annotated[
-        SpeechComplexity,
-        Field(
-            description="Speech environment complexity level: 'control' (clean speech, no effects), 'regular' (realistic with background noise and effects), plus ablation variants",
-            default="regular",
-        ),
-    ]
-    agent_voice_settings: Annotated[
-        Optional[VoiceSettings],
-        Field(
-            description="Voice synthesis and transcription settings for the agent",
-            default=None,
-        ),
-    ]
-    user_voice_settings: Annotated[
-        Optional[VoiceSettings],
-        Field(
-            description="Voice synthesis and transcription settings for the user",
-            default=None,
-        ),
-    ]
-    audio_debug: Annotated[
-        bool,
-        Field(
-            description="Enable audio debugging: saves per-tick audio files and analysis report.",
-            default=False,
-        ),
-    ]
-    audio_taps: Annotated[
-        bool,
-        Field(
-            description="Enable audio tap recording at each pipeline stage for signal analysis.",
-            default=False,
-        ),
-    ]
-
-    # ---- Properties ----
-
-    @property
-    def effective_agent(self) -> str:
-        return DEFAULT_AUDIO_NATIVE_AGENT_IMPLEMENTATION
-
-    @property
-    def effective_user(self) -> str:
-        return DEFAULT_AUDIO_NATIVE_USER_IMPLEMENTATION
-
-    @property
-    def effective_max_steps(self) -> int:
-        return self.audio_native_config.max_steps_ticks
-
-    @property
-    def effective_agent_model(self) -> str:
-        return self.audio_native_config.model
-
-    @property
-    def effective_agent_provider(self) -> Optional[str]:
-        return self.audio_native_config.provider
-
-
-# Type alias for backward compatibility: accepts either text or voice config
-RunConfig = Union[TextRunConfig, VoiceRunConfig]
+# Type alias kept for backward compatibility.
+RunConfig = TextRunConfig
 
 
 class NLAssertionCheck(BaseModel):
@@ -776,18 +447,9 @@ class ReviewError(BaseModel):
         description="Error severity. For user errors: 'critical_helped' (helped agent inappropriately), 'critical_hindered' (made task harder/impossible), 'minor' (no impact). For agent errors: 'critical' (caused failure or policy violation), 'minor' (suboptimal but no impact).",
         default=None,
     )
-    # For full-duplex conversations, use tick_start/tick_end to identify the segment
     # For turn-based conversations, turn_idx is still used
     turn_idx: Optional[int] = Field(
         description="The turn index where the error occurred (turn-based only).",
-        default=None,
-    )
-    tick_start: Optional[int] = Field(
-        description="Start tick of the segment where the error occurred (full-duplex only).",
-        default=None,
-    )
-    tick_end: Optional[int] = Field(
-        description="End tick of the segment where the error occurred (full-duplex only).",
         default=None,
     )
     reasoning: str = Field(
@@ -838,18 +500,9 @@ class UserOnlyReviewError(BaseModel):
     Represents an error made by the user simulator during a conversation.
     """
 
-    # For full-duplex conversations, use tick_start/tick_end to identify the segment
     # For turn-based conversations, turn_idx is still used
     turn_idx: Optional[int] = Field(
         description="The turn index where the error occurred (turn-based only).",
-        default=None,
-    )
-    tick_start: Optional[int] = Field(
-        description="Start tick of the segment where the error occurred (full-duplex only).",
-        default=None,
-    )
-    tick_end: Optional[int] = Field(
-        description="End tick of the segment where the error occurred (full-duplex only).",
         default=None,
     )
     error_type: str = Field(
@@ -903,49 +556,6 @@ class UserOnlyReview(BaseModel):
     )
 
 
-class HallucinationCheckError(BaseModel):
-    """
-    Represents a hallucination detected in the user simulator's messages.
-    """
-
-    reasoning: str = Field(description="Explanation of why this is a hallucination.")
-    user_message: Optional[str] = Field(
-        description="The problematic user message content.",
-        default=None,
-    )
-    correct_behavior: Optional[str] = Field(
-        description="What the user should have said or done instead.",
-        default=None,
-    )
-
-
-class HallucinationCheck(BaseModel):
-    """
-    Result of checking a conversation for user simulator hallucinations.
-    """
-
-    reasoning: str = Field(
-        description="Step-by-step reasoning about the conversation before the decision.",
-        default="",
-    )
-    hallucination_found: bool = Field(
-        description="Whether any hallucinations were detected.",
-        default=False,
-    )
-    errors: list[HallucinationCheckError] = Field(
-        description="List of hallucinations found.",
-        default_factory=list,
-    )
-    summary: str = Field(
-        description="Brief summary of the hallucination check.",
-        default="",
-    )
-    cost: Optional[float] = Field(
-        description="The cost of the hallucination check.",
-        default=None,
-    )
-
-
 class AuthenticationClassification(BaseModel):
     """
     Classification of user authentication outcome in a conversation.
@@ -975,8 +585,6 @@ class ErrorSource(str, Enum):
 class ErrorType(str, Enum):
     """Type of error in a simulation."""
 
-    TRANSCRIPTION = "transcription"  # ASR/speech-to-text errors
-    VAD = "vad"  # Voice activity detection / turn-taking issues
     LOGICAL = "logical"  # Reasoning, tool call, or instruction following errors
     HALLUCINATION = "hallucination"  # Made up information
     UNRESPONSIVE = "unresponsive"  # Agent disappeared / no response / latency
@@ -1048,7 +656,7 @@ class SimulationNote(BaseModel):
     error_type: Annotated[
         Optional[ErrorType],
         Field(
-            description="Type of error: transcription, vad, logical, hallucination, unresponsive, or early_termination.",
+            description="Type of error: logical, hallucination, unresponsive, or early_termination.",
             default=None,
         ),
     ]
@@ -1187,10 +795,6 @@ class AgentInfo(BaseModel):
     llm_args: Optional[dict] = Field(
         description="The arguments to pass to the LLM for the agent.", default=None
     )
-    voice_settings: Optional[VoiceSettings] = Field(
-        description="Voice synthesis and transcription settings for the agent",
-        default=None,
-    )
 
 
 class UserInfo(BaseModel):
@@ -1205,10 +809,6 @@ class UserInfo(BaseModel):
     )
     global_simulation_guidelines: Optional[str] = Field(
         description="The global simulation guidelines for the user.", default=None
-    )
-    voice_settings: Optional[VoiceSettings] = Field(
-        description="Voice synthesis and transcription settings for the user",
-        default=None,
     )
     persona_config: Optional[PersonaConfig] = Field(
         description="Runtime persona configuration for the user simulator",
@@ -1228,18 +828,6 @@ class Info(BaseModel):
     environment_info: EnvironmentInfo = Field(description="Environment information.")
     seed: Optional[int] = Field(
         description="The seed used for the simulation.", default=None
-    )
-    text_streaming_config: Optional[dict] = Field(
-        description="Text streaming configuration",
-        default=deepcopy(DEFAULT_TEXT_STREAMING_CONFIG),
-    )
-    speech_complexity: Optional[SpeechComplexity] = Field(
-        description="Speech complexity level for audio-native mode",
-        default=None,
-    )
-    audio_native_config: Optional["AudioNativeConfig"] = Field(
-        description="Configuration for audio-native mode",
-        default=None,
     )
     retrieval_config: Optional[str] = Field(
         description="Knowledge retrieval config name (knowledge domain only).",
@@ -1286,22 +874,11 @@ class SimulationRun(BaseModel):
     user_cost: Optional[float] = Field(
         description="The cost of the user.", default=None
     )
-    agent_usage: Optional[SessionUsage] = Field(
-        description="Aggregated provider usage (and cost breakdown) for the "
-        "agent side. Populated for audio-native full-duplex runs.",
-        default=None,
-    )
     reward_info: Optional[RewardInfo] = Field(
         description="The reward received by the agent.", default=None
     )
     messages: Optional[list[Message]] = Field(
-        description="The messages exchanged between the user, agent and environment. "
-        "Populated for half-duplex simulations. For full-duplex, use get_messages() "
-        "which derives messages from ticks when this field is None.",
-        default=None,
-    )
-    ticks: Optional[list[Tick]] = Field(
-        description="The ticks of the simulation. Only available in full-duplex mode.",
+        description="The messages exchanged between the user, agent and environment.",
         default=None,
     )
     trial: Optional[int] = Field(description="Trial number", default=None)
@@ -1310,11 +887,7 @@ class SimulationRun(BaseModel):
     )
     mode: str = Field(
         description="The communication mode used for the simulation.",
-        default=CommunicationMode.HALF_DUPLEX.value,
-    )
-    speech_environment: Optional[SpeechEnvironment] = Field(
-        description="Speech environment used for this simulation",
-        default=None,
+        default="half_duplex",
     )
     review: Optional[Review] = Field(  # TODO: Add auth_classification to review field
         description="LLM-based review of the conversation (agent + user errors).",
@@ -1334,45 +907,14 @@ class SimulationRun(BaseModel):
             default=None,
         )
     )
-    hallucination_retries_used: int = Field(
-        description="Number of retries triggered by user simulator hallucinations.",
-        default=0,
-    )
-    hallucination_check: Optional[HallucinationCheck] = Field(
-        description="Result of the hallucination check for this simulation.",
-        default=None,
-    )
-    provider_session_id: Optional[str] = Field(
-        description="Provider session ID (e.g., OpenAI session ID, xAI conversation ID) for debugging.",
-        default=None,
-    )
     policy: Optional[str] = Field(
         description="The policy/system prompt used for this simulation (knowledge domain only).",
         default=None,
     )
-    effect_timeline: Optional[EffectTimeline] = Field(
-        description="Timeline of audio effect events during the simulation (full-duplex voice only).",
-        default=None,
-    )
 
     def get_messages(self) -> list[Message]:
-        """Return the flat message list, deriving from ticks if messages is not stored.
-
-        For half-duplex simulations, returns the stored messages directly.
-        For full-duplex simulations where messages were not stored (to save space),
-        derives them by flattening ticks.
-        """
-        if self.messages is not None:
-            return self.messages
-        if self.ticks is not None:
-            messages: list[Message] = []
-            for tick in self.ticks:
-                messages.extend(tick.get_all_messages())
-            messages = sorted(messages, key=lambda m: m.timestamp)
-            for i, msg in enumerate(messages):
-                msg.turn_idx = i
-            return messages
-        return []
+        """Return the flat message list."""
+        return self.messages if self.messages is not None else []
 
 
 class SimulationIndexEntry(BaseModel):
@@ -1400,7 +942,7 @@ class Results(BaseModel):
     Supports two storage formats:
     - "json": single monolithic JSON file with all data (default for text runs).
     - "dir": metadata in results.json + individual simulation files in a
-      simulations/ subdirectory (default for voice runs — enables random
+      simulations/ subdirectory (enables random
       access and O(1) checkpointing for large simulation files).
 
     Use load()/save() for full round-trip. Use load_metadata() for fast metadata

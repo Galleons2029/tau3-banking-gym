@@ -4,20 +4,11 @@ Helper functions for task loading, run configuration, and metadata.
 
 from typing import Optional
 
-from tau2.data_model.simulation import (
-    AgentInfo,
-    Info,
-    RunConfig,
-    UserInfo,
-    VoiceRunConfig,
-)
+from tau2.data_model.simulation import AgentInfo, Info, RunConfig, UserInfo
 from tau2.data_model.tasks import Task
 from tau2.environment.environment import EnvironmentInfo
 from tau2.registry import RegistryInfo, registry
-from tau2.user.user_simulator import (
-    get_global_user_sim_guidelines,
-    get_global_user_sim_guidelines_voice,
-)
+from tau2.user.user_simulator import get_global_user_sim_guidelines
 from tau2.utils.utils import get_commit_hash, get_now
 
 
@@ -95,80 +86,44 @@ def get_tasks(
 
 def make_run_name(config: RunConfig) -> str:
     """Generate a run name from the run config."""
-    is_voice = isinstance(config, VoiceRunConfig)
-
-    if is_voice:
-        llm_agent_name = (
-            f"{config.audio_native_config.provider}-{config.audio_native_config.model}"
-        )
-    else:
-        llm_agent_name = config.llm_agent
+    llm_agent_name = config.llm_agent
     clean_llm_agent_name = [x for x in llm_agent_name.split("/") if x][-1]
     agent_name = f"{config.effective_agent}_{clean_llm_agent_name}"
 
     clean_llm_user_name = [x for x in config.llm_user.split("/") if x][-1]
     user_name = f"{config.effective_user}_{clean_llm_user_name}"
 
-    name = (
+    return (
         f"{get_now(use_compact_format=True)}_{config.domain}_{agent_name}_{user_name}"
     )
-
-    if is_voice:
-        name = f"{name}_audio_native"
-
-    return name
 
 
 def get_info(config: RunConfig, **overrides) -> Info:
     """Create an Info object for storing run configuration metadata.
 
     Args:
-        config: The run configuration (TextRunConfig or VoiceRunConfig).
+        config: The run configuration.
         **overrides: Override specific fields (e.g., user_persona_config,
-            user_voice_settings, speech_complexity, policy_override).
+            policy_override).
 
     Returns:
         Info object with run metadata.
     """
-    is_voice = isinstance(config, VoiceRunConfig)
-
     user_persona_config = overrides.get("user_persona_config")
-    user_voice_settings = overrides.get("user_voice_settings")
     policy_override = overrides.get("policy_override")
-    speech_complexity = overrides.get(
-        "speech_complexity",
-        config.speech_complexity if is_voice else None,
-    )
-
-    # Use voice guidelines for voice mode
-    if is_voice:
-        global_user_sim_guidelines = get_global_user_sim_guidelines_voice()
-    else:
-        global_user_sim_guidelines = get_global_user_sim_guidelines()
 
     user_info = UserInfo(
         implementation=config.effective_user,
         llm=config.llm_user,
         llm_args=config.llm_args_user,
-        global_simulation_guidelines=global_user_sim_guidelines,
+        global_simulation_guidelines=get_global_user_sim_guidelines(),
         persona_config=user_persona_config,
-        voice_settings=user_voice_settings,
     )
-
-    # For voice mode, agent uses Realtime API, not a regular LLM
-    if is_voice:
-        agent_llm = (
-            f"{config.audio_native_config.provider}:{config.audio_native_config.model}"
-        )
-        agent_llm_args = None
-    else:
-        agent_llm = config.llm_agent
-        agent_llm_args = config.llm_args_agent
 
     agent_info = AgentInfo(
         implementation=config.effective_agent,
-        llm=agent_llm,
-        llm_args=agent_llm_args,
+        llm=config.llm_agent,
+        llm_args=config.llm_args_agent,
     )
     # Build env_kwargs so the environment is constructed with the correct
     # retrieval variant (needed for banking_knowledge; no-op for other domains).
@@ -194,8 +149,6 @@ def get_info(config: RunConfig, **overrides) -> Info:
         agent_info=agent_info,
         environment_info=environment_info,
         seed=config.seed,
-        speech_complexity=speech_complexity,
-        audio_native_config=getattr(config, "audio_native_config", None),
         retrieval_config=getattr(config, "retrieval_config", None),
         retrieval_config_kwargs=getattr(config, "retrieval_config_kwargs", None),
     )

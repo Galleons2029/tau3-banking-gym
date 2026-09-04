@@ -36,25 +36,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-voice = [
-    "elevenlabs>=1.54.0",
-    "deepgram-sdk>=3.7.3",
-    "websockets>=13.0",
-    "pyaudio>=0.2.14",
-    "jiwer>=3.0.0",
-    "scipy>=1.10.0",
-    "pydub>=0.25.0",
-    "tqdm>=4.0",
-    "aiohttp>=3.0",
-    "google-genai>=1.0.0",
-    "boto3>=1.35.0",
-    "aws-sdk-bedrock-runtime>=0.3.0",
-    "google-cloud-aiplatform>=1.38.0",
-    "google-auth>=2.23.0",
-    "livekit-agents>=1.5.0",
-    "livekit-plugins-deepgram>=1.5.0",
-    "livekit-plugins-openai>=1.5.0",
-]
 knowledge = [
     "rank-bm25>=0.2.2",
     "openai>=1.0.0",
@@ -75,7 +56,7 @@ experiments = [
     "scikit-learn>=1.6.1",
 ]
 all = [
-    "tau2[voice,knowledge,gym,dev,experiments]",
+    "tau2[knowledge,gym,dev,experiments]",
 ]
 [project.urls]
 Homepage = "https://taubench.com/"
@@ -90,9 +71,6 @@ filterwarnings = [
     "ignore:Pydantic serializer warnings:UserWarning:pydantic.*:",
 ]
 asyncio_default_fixture_loop_scope = "function"
-markers = [
-    "full_duplex_integration: marks tests as full-duplex integration tests requiring OpenAI Realtime API and TTS (deselect with '-m \"not full_duplex_integration\"')",
-]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I"]

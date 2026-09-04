@@ -3,10 +3,6 @@ import json
 
 from tau2.config import (
     DEFAULT_AGENT_IMPLEMENTATION,
-    DEFAULT_AUDIO_NATIVE_MODELS,
-    DEFAULT_AUDIO_NATIVE_PROVIDER,
-    DEFAULT_INTEGRATION_DURATION_SECONDS,
-    DEFAULT_INTERRUPTION_CHECK_INTERVAL_SECONDS,
     DEFAULT_LLM_AGENT,
     DEFAULT_LLM_EVAL_USER_SIMULATOR,
     DEFAULT_LLM_LOG_MODE,
@@ -17,28 +13,14 @@ from tau2.config import (
     DEFAULT_MAX_CONCURRENCY,
     DEFAULT_MAX_ERRORS,
     DEFAULT_MAX_STEPS,
-    DEFAULT_MAX_STEPS_SECONDS,
     DEFAULT_NUM_TRIALS,
-    DEFAULT_PCM_SAMPLE_RATE,
     DEFAULT_RETRY_ATTEMPTS,
     DEFAULT_RETRY_MIN_WAIT,
     DEFAULT_SEED,
-    DEFAULT_SILENCE_ANNOTATION_THRESHOLD_SECONDS,
-    DEFAULT_SPEECH_COMPLEXITY,
-    DEFAULT_TELEPHONY_RATE,
-    DEFAULT_TICK_DURATION_SECONDS,
     DEFAULT_USER_IMPLEMENTATION,
-    DEFAULT_WAIT_TO_RESPOND_THRESHOLD_OTHER_SECONDS,
-    DEFAULT_WAIT_TO_RESPOND_THRESHOLD_SELF_SECONDS,
-    DEFAULT_YIELD_THRESHOLD_WHEN_INTERRUPTED_SECONDS,
-    DEFAULT_YIELD_THRESHOLD_WHEN_INTERRUPTING_SECONDS,
 )
 from tau2.data_model.persona import PersonaConfig
-from tau2.data_model.simulation import (
-    AudioNativeConfig,
-    TextRunConfig,
-    VoiceRunConfig,
-)
+from tau2.data_model.simulation import TextRunConfig
 from tau2.domains.banking_knowledge.retrieval import get_all_variant_names
 from tau2.run import get_options, run_domain
 from tau2.runner.work import parse_provider_limits
@@ -190,23 +172,8 @@ def add_run_args(parser):
         "--verbose-logs",
         action="store_true",
         default=False,
-        help="Enable verbose logging: saves LLM call logs, audio files, per-task logs, and ticks (for audio-native). "
+        help="Enable verbose logging: saves LLM call logs and per-task logs. "
         "Files are saved to the save directory (auto-generated if --save-to not specified).",
-    )
-    parser.add_argument(
-        "--audio-debug",
-        action="store_true",
-        default=False,
-        help="Enable audio debugging for audio-native mode. Saves per-tick audio files and timing "
-        "analysis report for diagnosing alignment issues. Requires --audio-native.",
-    )
-    parser.add_argument(
-        "--audio-taps",
-        action="store_true",
-        default=False,
-        help="Enable audio tap recording for audio-native mode. Saves WAV files at each pipeline "
-        "stage (pre-effects, post-noise, post-telephony, final, agent-input) for diagnosing "
-        "signal property differences. Requires --audio-native.",
     )
     parser.add_argument(
         "--llm-log-mode",
@@ -244,147 +211,6 @@ def add_run_args(parser):
         'Examples: \'{"verbosity": "minimal"}\', '
         '\'{"verbosity": {"minimal": 0.8, "standard": 0.2}}\'. '
         "If not provided, uses default behavior (standard verbosity).",
-    )
-
-    # Audio-native mode arguments
-    parser.add_argument(
-        "--audio-native",
-        action="store_true",
-        default=False,
-        help="Enable audio-native mode using DiscreteTimeAudioNativeAgent with VoiceStreamingUserSimulator. "
-        "This enables full-duplex voice simulation using audio native APIs.",
-    )
-    parser.add_argument(
-        "--audio-native-provider",
-        type=str,
-        choices=["openai", "gemini", "xai", "nova", "qwen", "livekit"],
-        default=DEFAULT_AUDIO_NATIVE_PROVIDER,
-        help=f"Audio native API provider. Default is '{DEFAULT_AUDIO_NATIVE_PROVIDER}'.",
-    )
-    parser.add_argument(
-        "--cascaded-config",
-        type=str,
-        default=None,
-        help="Cascaded config preset name for livekit provider. "
-        "Available presets: 'default', 'openai-thinking'. "
-        "See tau2.voice.audio_native.livekit.config for details.",
-    )
-    parser.add_argument(
-        "--audio-native-model",
-        type=str,
-        default=None,
-        help="Audio native model to use. If not specified, uses the default model for the selected provider.",
-    )
-    parser.add_argument(
-        "--reasoning-effort",
-        type=str,
-        choices=["minimal", "low", "medium", "high", "xhigh"],
-        default=None,
-        help="Reasoning effort for thinking models. Only applies to providers that support it (e.g. OpenAI).",
-    )
-    parser.add_argument(
-        "--tick-duration",
-        type=float,
-        default=DEFAULT_TICK_DURATION_SECONDS,
-        help=f"Tick duration in seconds for audio-native mode. Default is {DEFAULT_TICK_DURATION_SECONDS}.",
-    )
-    parser.add_argument(
-        "--max-steps-seconds",
-        type=int,
-        default=DEFAULT_MAX_STEPS_SECONDS,
-        help=f"Maximum conversation duration in seconds for audio-native mode. Default is {DEFAULT_MAX_STEPS_SECONDS}.",
-    )
-    parser.add_argument(
-        "--speech-complexity",
-        type=str,
-        choices=[
-            "control",
-            "regular",
-            # Single-feature ablations
-            "control_audio",
-            "control_accents",
-            "control_behavior",
-            # Pairwise ablations
-            "control_audio_accents",
-            "control_audio_behavior",
-            "control_accents_behavior",
-        ],
-        default=DEFAULT_SPEECH_COMPLEXITY,
-        help=f"Speech complexity level for audio effects. Default is '{DEFAULT_SPEECH_COMPLEXITY}'.",
-    )
-
-    # Audio-native: Sample rates
-    parser.add_argument(
-        "--pcm-sample-rate",
-        type=int,
-        default=DEFAULT_PCM_SAMPLE_RATE,
-        help=f"User simulator PCM synthesis sample rate. Default is {DEFAULT_PCM_SAMPLE_RATE}.",
-    )
-    parser.add_argument(
-        "--telephony-rate",
-        type=int,
-        default=DEFAULT_TELEPHONY_RATE,
-        help=f"API/agent telephony sample rate (OpenAI Realtime API). Default is {DEFAULT_TELEPHONY_RATE}.",
-    )
-
-    # Audio-native: Turn-taking thresholds
-    parser.add_argument(
-        "--wait-to-respond-other",
-        type=float,
-        default=DEFAULT_WAIT_TO_RESPOND_THRESHOLD_OTHER_SECONDS,
-        help=f"Min time since OTHER (agent) spoke before user responds (seconds). Default is {DEFAULT_WAIT_TO_RESPOND_THRESHOLD_OTHER_SECONDS}.",
-    )
-    parser.add_argument(
-        "--wait-to-respond-self",
-        type=float,
-        default=DEFAULT_WAIT_TO_RESPOND_THRESHOLD_SELF_SECONDS,
-        help=f"Min time since SELF (user) spoke before responding (seconds). Default is {DEFAULT_WAIT_TO_RESPOND_THRESHOLD_SELF_SECONDS}.",
-    )
-    parser.add_argument(
-        "--yield-when-interrupted",
-        type=float,
-        default=DEFAULT_YIELD_THRESHOLD_WHEN_INTERRUPTED_SECONDS,
-        help=f"How long user keeps speaking when agent interrupts (seconds). Default is {DEFAULT_YIELD_THRESHOLD_WHEN_INTERRUPTED_SECONDS}.",
-    )
-    parser.add_argument(
-        "--yield-when-interrupting",
-        type=float,
-        default=DEFAULT_YIELD_THRESHOLD_WHEN_INTERRUPTING_SECONDS,
-        help=f"How long user keeps speaking when user interrupts agent (seconds). Default is {DEFAULT_YIELD_THRESHOLD_WHEN_INTERRUPTING_SECONDS}.",
-    )
-    parser.add_argument(
-        "--interruption-check-interval",
-        type=float,
-        default=DEFAULT_INTERRUPTION_CHECK_INTERVAL_SECONDS,
-        help=f"Interval for checking interruptions (seconds). Default is {DEFAULT_INTERRUPTION_CHECK_INTERVAL_SECONDS}.",
-    )
-    parser.add_argument(
-        "--integration-duration",
-        type=float,
-        default=DEFAULT_INTEGRATION_DURATION_SECONDS,
-        help=f"Integration duration for linearization (seconds). Default is {DEFAULT_INTEGRATION_DURATION_SECONDS}.",
-    )
-    parser.add_argument(
-        "--silence-annotation-threshold",
-        type=float,
-        default=DEFAULT_SILENCE_ANNOTATION_THRESHOLD_SECONDS,
-        help=f"Silence threshold for adding annotations to conversation history (seconds). Default is {DEFAULT_SILENCE_ANNOTATION_THRESHOLD_SECONDS}.",
-    )
-
-    # Audio-native: Agent behavior flags
-    # Prompt format
-    prompt_format_group = parser.add_mutually_exclusive_group()
-    prompt_format_group.add_argument(
-        "--xml-prompt",
-        action="store_true",
-        default=False,
-        help="Use XML tags in system prompt (overrides auto-detection).",
-    )
-    prompt_format_group.add_argument(
-        "--no-xml-prompt",
-        action="store_true",
-        default=False,
-        help="Use plain text system prompt without XML tags (overrides auto-detection).",
     )
 
     # Knowledge domain arguments
@@ -437,12 +263,6 @@ def add_run_args(parser):
         default=DEFAULT_LLM_EVAL_USER_SIMULATOR,
         help=f"LLM model to use for review calls. Default is {DEFAULT_LLM_EVAL_USER_SIMULATOR}.",
     )
-    parser.add_argument(
-        "--hallucination-retries",
-        type=int,
-        default=3,
-        help="Max retries when a user simulator hallucination is detected (full-duplex only). Set to 0 to disable.",
-    )
 
 
 def _get_version() -> str:
@@ -494,10 +314,6 @@ def run_intro():
     modes_table.add_row(
         "Half-duplex (text)",
         "Turn-based text conversations. Agent and user take turns exchanging messages.",
-    )
-    modes_table.add_row(
-        "Full-duplex (voice)",
-        "Real-time audio-native voice using streaming APIs (OpenAI, Gemini, xAI).",
     )
     console.print(modes_table)
     console.print()
@@ -569,10 +385,7 @@ def run_intro():
         "tau2 run --domain airline --agent-llm gpt-4.1 --user-llm gpt-4.1 "
         "--num-trials 1 --num-tasks 5\n"
         "\n"
-        "# 3. Run a voice (full-duplex) evaluation\n"
-        "tau2 run --domain retail --audio-native --num-tasks 1 --verbose-logs\n"
-        "\n"
-        "# 4. Browse results\n"
+        "# 3. Browse results\n"
         "tau2 view\n"
         "\n"
         "# 5. Check the leaderboard\n"
@@ -607,45 +420,6 @@ def main():
         if args.user_persona:
             user_persona_config = PersonaConfig.from_dict(args.user_persona)  # noqa: F841
 
-        # Build audio-native config if enabled
-        audio_native_config = None
-        if args.audio_native:
-            # Resolve model based on provider if not specified
-            audio_native_model = args.audio_native_model
-            if audio_native_model is None:
-                audio_native_model = DEFAULT_AUDIO_NATIVE_MODELS[
-                    args.audio_native_provider
-                ]
-
-            # Determine use_xml_prompt: defaults to False (plain text)
-            use_xml_prompt = False
-            if args.xml_prompt:
-                use_xml_prompt = True
-
-            audio_native_config = AudioNativeConfig(
-                # Provider
-                provider=args.audio_native_provider,
-                model=audio_native_model,
-                cascaded_config_name=args.cascaded_config,
-                reasoning_effort=args.reasoning_effort,
-                # Timing
-                tick_duration_seconds=args.tick_duration,
-                max_steps_seconds=args.max_steps_seconds,
-                # Sample rates
-                pcm_sample_rate=args.pcm_sample_rate,
-                telephony_rate=args.telephony_rate,
-                # Turn-taking thresholds
-                wait_to_respond_threshold_other_seconds=args.wait_to_respond_other,
-                wait_to_respond_threshold_self_seconds=args.wait_to_respond_self,
-                yield_threshold_when_interrupted_seconds=args.yield_when_interrupted,
-                yield_threshold_when_interrupting_seconds=args.yield_when_interrupting,
-                interruption_check_interval_seconds=args.interruption_check_interval,
-                integration_duration_seconds=args.integration_duration,
-                silence_annotation_threshold_seconds=args.silence_annotation_threshold,
-                # Agent behavior
-                use_xml_prompt=use_xml_prompt,
-            )
-
         # Set global LLM log mode (used by verbose logging)
         from tau2.utils.llm_utils import set_llm_log_mode
 
@@ -676,29 +450,19 @@ def main():
             auto_review=args.auto_review,
             review_mode=args.review_mode,
             review_model=args.review_model,
-            hallucination_retries=args.hallucination_retries,
             retrieval_config=args.retrieval_config,
             retrieval_config_kwargs=args.retrieval_config_kwargs,
         )
 
-        if audio_native_config is not None:
-            config = VoiceRunConfig(
-                **shared_kwargs,
-                audio_native_config=audio_native_config,
-                speech_complexity=args.speech_complexity,
-                audio_debug=getattr(args, "audio_debug", False),
-                audio_taps=getattr(args, "audio_taps", False),
-            )
-        else:
-            config = TextRunConfig(
-                **shared_kwargs,
-                agent=args.agent,
-                llm_agent=args.agent_llm,
-                llm_args_agent=args.agent_llm_args,
-                user=args.user,
-                max_steps=args.max_steps,
-                enforce_communication_protocol=args.enforce_communication_protocol,
-            )
+        config = TextRunConfig(
+            **shared_kwargs,
+            agent=args.agent,
+            llm_agent=args.agent_llm,
+            llm_args_agent=args.agent_llm_args,
+            user=args.user,
+            max_steps=args.max_steps,
+            enforce_communication_protocol=args.enforce_communication_protocol,
+        )
 
         return run_domain(config)
 
@@ -731,11 +495,6 @@ def main():
         "--only-show-all-failed",
         action="store_true",
         help="Only show tasks that failed in all trials.",
-    )
-    view_parser.add_argument(
-        "--expanded-ticks",
-        action="store_true",
-        help="Show expanded tick view instead of consolidated (for full-duplex simulations).",
     )
     view_parser.add_argument(
         "--max-tool-result-chars",
@@ -854,11 +613,6 @@ def main():
         help="Output path for the reviewed results (only used for single file)",
     )
     review_parser.add_argument(
-        "--interruption-enabled",
-        action="store_true",
-        help="Flag indicating that interruption was enabled for these simulations",
-    )
-    review_parser.add_argument(
         "--show-details",
         action="store_true",
         help="Show detailed review results for each simulation",
@@ -953,12 +707,6 @@ def main():
         action="store_true",
         help="Skip trajectory verification step",
     )
-    submit_prepare_parser.add_argument(
-        "--voice",
-        action="store_true",
-        default=None,
-        help="Force voice submission mode (auto-detected from input data if not specified)",
-    )
     submit_prepare_parser.set_defaults(func=lambda args: run_prepare_submission(args))
 
     # Submit validate subcommand
@@ -981,26 +729,6 @@ def main():
         help="Paths to trajectory files, directories, or glob patterns",
     )
     submit_verify_parser.set_defaults(func=lambda args: run_verify_trajectories(args))
-
-    # Submit interaction-metrics subcommand
-    submit_im_parser = submit_subparsers.add_parser(
-        "interaction-metrics",
-        help="Compute voice interaction metrics (latency, responsiveness, "
-        "interrupts, selectivity) from full-duplex trajectories",
-    )
-    submit_im_parser.add_argument(
-        "input_paths",
-        nargs="+",
-        help="Voice experiment directories (results.json + simulations/) or a "
-        "parent directory such as a submission's trajectories/ dir",
-    )
-    submit_im_parser.add_argument(
-        "--output",
-        "-o",
-        default=None,
-        help="Optional path to write the interaction_metrics JSON block",
-    )
-    submit_im_parser.set_defaults(func=lambda args: run_interaction_metrics(args))
 
     # Convert results format command
     convert_parser = subparsers.add_parser(
@@ -1047,7 +775,6 @@ def run_view_simulations(args):
         only_show_failed=args.only_show_failed,
         only_show_all_failed=args.only_show_all_failed,
         sim_dir=args.dir,
-        expanded_ticks=args.expanded_ticks,
         max_tool_result_length=max_tool_result_length,
     )
 
@@ -1143,7 +870,6 @@ def run_review(args):
             results_path=str(results_file),
             mode=mode,
             output_path=args.output if len(results_files) == 1 else None,
-            interruption_enabled=args.interruption_enabled,
             show_details=args.show_details,
             max_concurrency=args.max_concurrency,
             limit=args.limit,
@@ -1161,7 +887,6 @@ def run_prepare_submission(args):
         input_paths=args.input_paths,
         output_dir=args.output,
         run_verification=not args.no_verify,
-        voice=args.voice if args.voice else None,
     )
 
 
@@ -1170,18 +895,6 @@ def run_validate_submission(args):
     from tau2.scripts.leaderboard.prepare_submission import validate_submission
 
     validate_submission(submission_dir=args.submission_dir)
-
-
-def run_interaction_metrics(args):
-    """Run the interaction metrics computation command."""
-    from tau2.scripts.leaderboard.compute_interaction_metrics import (
-        compute_interaction_metrics,
-    )
-
-    compute_interaction_metrics(
-        input_paths=args.input_paths,
-        output_path=args.output,
-    )
 
 
 def run_manual_mode():

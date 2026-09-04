@@ -155,33 +155,15 @@ class UserReviewOutput(BaseModel):
 # =============================================================================
 
 
-def is_full_duplex(simulation: SimulationRun) -> bool:
-    """Check if the simulation used full-duplex mode (has ticks)."""
-    return simulation.ticks is not None and len(simulation.ticks) > 0
-
-
 def get_full_trajectory_string(simulation: SimulationRun) -> str:
     """Get the full conversation trajectory as a formatted string."""
-    if is_full_duplex(simulation):
-        return MarkdownDisplay.display_ticks_consolidated(
-            simulation.ticks,
-            effect_timeline=simulation.effect_timeline,
-        )
-    else:
-        return MarkdownDisplay.display_messages(simulation.messages)
+    return MarkdownDisplay.display_messages(simulation.messages)
 
 
 def get_user_visible_trajectory_string(simulation: SimulationRun) -> str:
     """Get the user-visible trajectory as a formatted string."""
-    if is_full_duplex(simulation):
-        return MarkdownDisplay.display_ticks_consolidated(
-            simulation.ticks,
-            user_visible_only=True,
-            effect_timeline=simulation.effect_timeline,
-        )
-    else:
-        messages = UserOnlyReviewer.make_user_visible_trajectory(simulation.messages)
-        return MarkdownDisplay.display_messages(messages)
+    messages = UserOnlyReviewer.make_user_visible_trajectory(simulation.messages)
+    return MarkdownDisplay.display_messages(messages)
 
 
 # =============================================================================
@@ -193,7 +175,6 @@ def review_simulation_full(
     simulation: SimulationRun,
     task: Task,
     results: Results,
-    interruption_enabled: bool = False,
     review_model: str = DEFAULT_LLM_EVAL_USER_SIMULATOR,
 ) -> tuple[Review, AuthenticationClassification, str]:
     """
@@ -217,7 +198,6 @@ def review_simulation_full(
         mode=ReviewMode.FULL,
         user_info=user_info,
         policy=policy,
-        interruption_enabled=interruption_enabled,
         review_model=review_model,
     )
 
@@ -231,7 +211,6 @@ def review_simulation_full(
 def run_full_review(
     results: Results,
     results_path: str,
-    interruption_enabled: bool = False,
     show_details: bool = False,
     max_concurrency: int = 32,
     review_model: str = DEFAULT_LLM_EVAL_USER_SIMULATOR,
@@ -276,7 +255,6 @@ def run_full_review(
                 simulation=simulation,
                 task=task,
                 results=results,
-                interruption_enabled=interruption_enabled,
                 review_model=review_model,
             )
 
@@ -421,7 +399,6 @@ def review_simulation_user(
     simulation: SimulationRun,
     task: Task,
     results: Results,
-    interruption_enabled: bool = False,
     review_model: str = DEFAULT_LLM_EVAL_USER_SIMULATOR,
 ) -> tuple[UserOnlyReview, str]:
     """
@@ -441,7 +418,6 @@ def review_simulation_user(
         task=task,
         mode=ReviewMode.USER,
         user_info=user_info,
-        interruption_enabled=interruption_enabled,
         review_model=review_model,
     )
 
@@ -454,7 +430,6 @@ def review_simulation_user(
 def run_user_review(
     results: Results,
     results_path: str,
-    interruption_enabled: bool = False,
     show_details: bool = False,
     max_concurrency: int = 32,
     review_model: str = DEFAULT_LLM_EVAL_USER_SIMULATOR,
@@ -492,7 +467,6 @@ def run_user_review(
                 simulation=simulation,
                 task=task,
                 results=results,
-                interruption_enabled=interruption_enabled,
                 review_model=review_model,
             )
 
@@ -603,7 +577,6 @@ def review(
     results_path: str,
     mode: ReviewMode = ReviewMode.FULL,
     output_path: Optional[str] = None,
-    interruption_enabled: bool = False,
     show_details: bool = False,
     max_concurrency: int = 32,
     limit: Optional[int] = None,
@@ -618,7 +591,6 @@ def review(
         results_path: Path to the results.json file.
         mode: Review mode ("full" for agent+user, "user" for user only).
         output_path: Optional path to save the review output.
-        interruption_enabled: Whether interruption was enabled for these simulations.
         show_details: Whether to show detailed results for each simulation.
         max_concurrency: Maximum number of concurrent reviews.
         limit: Optional limit on number of simulations to review.
@@ -683,7 +655,6 @@ def review(
         output = run_full_review(
             results=results,
             results_path=results_path,
-            interruption_enabled=interruption_enabled,
             show_details=show_details,
             max_concurrency=max_concurrency,
             review_model=review_model,
@@ -693,7 +664,6 @@ def review(
         output = run_user_review(
             results=results,
             results_path=results_path,
-            interruption_enabled=interruption_enabled,
             show_details=show_details,
             max_concurrency=max_concurrency,
             review_model=review_model,
@@ -1031,9 +1001,6 @@ Examples:
   # With detailed output for each simulation
   python -m tau2.scripts.review_conversation run results.json --show-details
 
-  # For full-duplex simulations with interruption
-  python -m tau2.scripts.review_conversation run results.json --interruption-enabled
-
   # Use a different LiteLLM-compatible review model
   python -m tau2.scripts.review_conversation run results.json --review-model gpt-4.1
         """,
@@ -1057,11 +1024,6 @@ Examples:
         type=str,
         default=None,
         help="Output path for the review JSON. Defaults to <input>_<mode>_review.json.",
-    )
-    run_parser.add_argument(
-        "--interruption-enabled",
-        action="store_true",
-        help="Flag indicating that interruption was enabled for these simulations.",
     )
     run_parser.add_argument(
         "--show-details",
@@ -1219,7 +1181,6 @@ def main():
                 results_path=str(results_file),
                 mode=mode,
                 output_path=args.output if len(results_files) == 1 else None,
-                interruption_enabled=args.interruption_enabled,
                 show_details=args.show_details,
                 max_concurrency=args.max_concurrency,
                 review_model=args.review_model,

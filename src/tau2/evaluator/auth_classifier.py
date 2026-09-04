@@ -9,14 +9,12 @@ This classifier determines whether user authentication:
 
 import json
 import re
-from typing import Literal, Optional
+from typing import Literal
 
 from loguru import logger
-from rich.console import Console
-from rich.panel import Panel
 
 from tau2.config import DEFAULT_LLM_EVAL_USER_SIMULATOR
-from tau2.data_model.message import SystemMessage, Tick, UserMessage
+from tau2.data_model.message import SystemMessage, UserMessage
 from tau2.data_model.simulation import AuthenticationClassification
 from tau2.utils.display import MarkdownDisplay
 from tau2.utils.llm_utils import generate
@@ -152,79 +150,3 @@ class AuthenticationClassifier:
             reasoning=reasoning,
             cost=assistant_message.cost,
         )
-
-
-class FullDuplexAuthenticationClassifier:
-    """Classifier for user authentication outcomes in full-duplex conversations."""
-
-    @staticmethod
-    def classify(
-        ticks: list[Tick],
-        model: str = DEFAULT_LLM_EVAL_USER_SIMULATOR,
-    ) -> AuthenticationClassification:
-        """
-        Classify authentication outcome for a full-duplex conversation.
-
-        Args:
-            ticks: List of conversation ticks.
-            model: LLM model to use for classification.
-
-        Returns:
-            AuthenticationClassification with status, reasoning, and cost.
-        """
-        # Format conversation - use consolidated view for readability
-        conversation = MarkdownDisplay.display_ticks_consolidated(ticks)
-
-        # Build prompt
-        user_prompt = USER_PROMPT.format(conversation=conversation)
-
-        # Call LLM
-        assistant_message = generate(
-            model=model,
-            messages=[
-                SystemMessage(role="system", content=SYSTEM_PROMPT),
-                UserMessage(role="user", content=user_prompt),
-            ],
-            call_name="classify_authentication",
-        )
-
-        # Parse response
-        status, reasoning = _parse_classification_response(assistant_message.content)
-
-        return AuthenticationClassification(
-            status=status,
-            reasoning=reasoning,
-            cost=assistant_message.cost,
-        )
-
-
-# =============================================================================
-# Display Functions
-# =============================================================================
-
-
-def display_auth_classification(
-    classification: AuthenticationClassification,
-    title: str = "Authentication Classification",
-    console: Optional[Console] = None,
-) -> None:
-    """Display authentication classification result."""
-    if console is None:
-        console = Console()
-
-    # Status emoji and color
-    status_display = {
-        "succeeded": ("✅", "green", "Authentication Succeeded"),
-        "failed": ("❌", "red", "Authentication Failed"),
-        "not_needed": ("➖", "dim", "Authentication Not Needed"),
-    }
-    emoji, color, label = status_display.get(
-        classification.status, ("❓", "yellow", "Unknown")
-    )
-
-    content = f"{emoji} **{label}**\n\n{classification.reasoning}"
-
-    if classification.cost:
-        content += f"\n\n_Cost: ${classification.cost:.4f}_"
-
-    console.print(Panel(content, title=title, border_style=color))

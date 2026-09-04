@@ -15,12 +15,7 @@ clean:
 ## Run core tests (requires: uv sync --extra dev)
 .PHONY: test
 test:
-	uv run pytest tests/ --ignore=tests/test_voice --ignore=tests/test_streaming --ignore=tests/test_gym --ignore=tests/test_domains/test_banking_knowledge
-
-## Run voice and streaming tests (requires: uv sync --extra dev --extra voice)
-.PHONY: test-voice
-test-voice:
-	uv run pytest tests/test_voice tests/test_streaming -m "not full_duplex_integration"
+	uv run pytest tests/ --ignore=tests/test_gym --ignore=tests/test_domains/test_banking_knowledge
 
 ## Run knowledge/banking tests (requires: uv sync --extra dev --extra knowledge)
 .PHONY: test-knowledge
