@@ -53,6 +53,18 @@ httpx_limits = httpx.Limits(max_keepalive_connections=5, max_connections=10)
 litellm.client_session = httpx.Client(limits=httpx_limits)
 litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
 
+# SiliconFlow deepseek-ai/DeepSeek-V4-Flash pricing (peak tier), in CNY not USD.
+litellm.register_model(
+    {
+        "openai/deepseek-ai/DeepSeek-V4-Flash": {
+            "input_cost_per_token": 3e-6,
+            "output_cost_per_token": 9e-6,
+            "litellm_provider": "openai",
+            "mode": "chat",
+        },
+    }
+)
+
 # Context variable to store the directory where LLM debug logs should be written
 llm_log_dir: ContextVar[Optional[Path]] = ContextVar("llm_log_dir", default=None)
 
