@@ -65,6 +65,20 @@ litellm.register_model(
     }
 )
 
+# Self-hosted deployment: no per-token billing, so cost is registered as zero.
+# Registering it explicitly (rather than leaving it unmapped) keeps
+# get_response_cost from logging a lookup error on every single call.
+litellm.register_model(
+    {
+        "openai/GLM5.3-agentic-qs-h20": {
+            "input_cost_per_token": 0.0,
+            "output_cost_per_token": 0.0,
+            "litellm_provider": "openai",
+            "mode": "chat",
+        },
+    }
+)
+
 # Context variable to store the directory where LLM debug logs should be written
 llm_log_dir: ContextVar[Optional[Path]] = ContextVar("llm_log_dir", default=None)
 
