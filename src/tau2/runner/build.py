@@ -37,7 +37,7 @@ def build_environment(
     Uses the registry to resolve the domain name to an environment constructor.
 
     Args:
-        domain: Domain name (e.g., "airline", "retail", "mock").
+        domain: Domain name (e.g., "banking_knowledge", "mock").
         solo_mode: If True, environment is built in solo mode (agent gets
             access to both agent and user tools).
         env_kwargs: Additional keyword arguments passed to the environment
@@ -232,8 +232,8 @@ def build_text_orchestrator(
         A fully constructed Orchestrator, ready for run_simulation().
 
     Example:
-        config = TextRunConfig(domain="airline", agent="llm_agent")
-        tasks = get_tasks("airline")
+        config = TextRunConfig(domain="banking_knowledge", agent="llm_agent")
+        tasks = get_tasks("banking_knowledge")
         orchestrator = build_text_orchestrator(config, tasks[0], seed=42)
         result = run_simulation(orchestrator)
     """

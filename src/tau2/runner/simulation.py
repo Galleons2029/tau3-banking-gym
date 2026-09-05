@@ -46,7 +46,7 @@ def run_simulation(
         user = UserSimulator(llm="gpt-4.1", instructions=task.user_scenario,
                              tools=env.get_user_tools())
         orchestrator = Orchestrator(
-            domain="airline", agent=agent, user=user,
+            domain="banking_knowledge", agent=agent, user=user,
             environment=env, task=task, max_steps=100,
         )
         result = run_simulation(orchestrator)

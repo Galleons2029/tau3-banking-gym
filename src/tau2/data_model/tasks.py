@@ -255,7 +255,7 @@ class RewardType(str, Enum):
       (per `Action.compare_with_tool_call`). The only reward type that
       makes the action list a hard requirement — promotes it to the
       assumed-unique correct trajectory. Used in a few
-      `banking_knowledge` tasks; not used in airline/retail/telecom.
+      `banking_knowledge` tasks; not used in the `mock` domain.
 
     See `docs/evaluation.md`.
     """

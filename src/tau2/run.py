@@ -13,7 +13,7 @@ Usage:
     # High-level: run all tasks in a domain
     from tau2.run import run_domain
     from tau2.data_model.simulation import TextRunConfig
-    results = run_domain(TextRunConfig(domain="retail", agent="llm_agent", ...))
+    results = run_domain(TextRunConfig(domain="banking_knowledge", agent="llm_agent", ...))
 
     # Mid-level: run a single task
     from tau2.run import get_tasks, run_single_task

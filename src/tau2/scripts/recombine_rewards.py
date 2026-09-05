@@ -94,7 +94,7 @@ def recombine_results(experiment_dir: str, domain: str | None = None) -> None:
 
     Args:
         experiment_dir: Path to experiment directory containing subdirectories with results.json
-        domain: Optional domain to filter (e.g., 'retail'). If None, processes all.
+        domain: Optional domain to filter (e.g., 'banking_knowledge'). If None, processes all.
     """
     experiment_path = Path(experiment_dir)
     if not experiment_path.exists():
@@ -256,7 +256,7 @@ def main():
     )
     parser.add_argument(
         "--domain",
-        help="Optional: only process this domain (e.g., 'retail')",
+        help="Optional: only process this domain (e.g., 'banking_knowledge')",
         default=None,
     )
 

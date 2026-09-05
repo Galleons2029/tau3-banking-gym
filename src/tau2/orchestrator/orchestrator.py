@@ -100,7 +100,7 @@ class BaseOrchestrator(ABC, Generic[BaseAgentT, BaseUserT, TrajectoryItemT]):
         Initialize the base orchestrator.
 
         Args:
-            domain: The domain name of the simulation (e.g., 'airline', 'retail', 'telecom').
+            domain: The domain name of the simulation (e.g., 'banking_knowledge', 'mock').
             agent: The agent instance.
             user: The user instance.
             environment: The environment instance that handles tool execution.
@@ -404,7 +404,7 @@ class Orchestrator(BaseOrchestrator[AgentT, UserT, Message]):
         alternate sending complete messages.
 
         Args:
-            domain: The domain name of the simulation (e.g., 'airline', 'retail', 'telecom').
+            domain: The domain name of the simulation (e.g., 'banking_knowledge', 'mock').
             agent: The agent instance that will respond to user requests and make tool calls.
             user: The user instance that interacts with the agent (can be UserSimulator or DummyUser).
             environment: The environment instance that handles tool execution and maintains state.

@@ -12,13 +12,6 @@ from tau2.agent.llm_agent import (
     create_llm_solo_agent,
 )
 from tau2.data_model.tasks import Task
-from tau2.domains.airline.environment import (
-    get_environment as airline_domain_get_environment,
-)
-from tau2.domains.airline.environment import get_tasks as airline_domain_get_tasks
-from tau2.domains.airline.environment import (
-    get_tasks_split as airline_domain_get_tasks_split,
-)
 from tau2.domains.banking_knowledge.environment import (
     get_environment as knowledge_domain_get_environment,
 )
@@ -27,29 +20,6 @@ from tau2.domains.banking_knowledge.environment import (
 )
 from tau2.domains.mock.environment import get_environment as mock_domain_get_environment
 from tau2.domains.mock.environment import get_tasks as mock_domain_get_tasks
-from tau2.domains.retail.environment import (
-    get_environment as retail_domain_get_environment,
-)
-from tau2.domains.retail.environment import get_tasks as retail_domain_get_tasks
-from tau2.domains.retail.environment import (
-    get_tasks_split as retail_domain_get_tasks_split,
-)
-from tau2.domains.telecom.environment import (
-    get_environment_manual_policy as telecom_domain_get_environment_manual_policy,
-)
-from tau2.domains.telecom.environment import (
-    get_environment_workflow_policy as telecom_domain_get_environment_workflow_policy,
-)
-from tau2.domains.telecom.environment import get_tasks as telecom_domain_get_tasks
-from tau2.domains.telecom.environment import (
-    get_tasks_full as telecom_domain_get_tasks_full,
-)
-from tau2.domains.telecom.environment import (
-    get_tasks_small as telecom_domain_get_tasks_small,
-)
-from tau2.domains.telecom.environment import (
-    get_tasks_split as telecom_domain_get_tasks_split,
-)
 from tau2.environment.environment import Environment
 from tau2.user.user_simulator import DummyUser, UserSimulator
 from tau2.user.user_simulator_base import HalfDuplexUser
@@ -291,37 +261,6 @@ try:
     )
     registry.register_domain(mock_domain_get_environment, "mock")
     registry.register_tasks(mock_domain_get_tasks, "mock")
-
-    registry.register_domain(airline_domain_get_environment, "airline")
-    registry.register_tasks(
-        airline_domain_get_tasks,
-        "airline",
-        get_task_splits=airline_domain_get_tasks_split,
-    )
-
-    registry.register_domain(retail_domain_get_environment, "retail")
-    registry.register_tasks(
-        retail_domain_get_tasks,
-        "retail",
-        get_task_splits=retail_domain_get_tasks_split,
-    )
-
-    registry.register_domain(telecom_domain_get_environment_manual_policy, "telecom")
-    registry.register_domain(
-        telecom_domain_get_environment_workflow_policy, "telecom-workflow"
-    )
-    registry.register_tasks(telecom_domain_get_tasks_full, "telecom_full")
-    registry.register_tasks(telecom_domain_get_tasks_small, "telecom_small")
-    registry.register_tasks(
-        telecom_domain_get_tasks,
-        "telecom",
-        get_task_splits=telecom_domain_get_tasks_split,
-    )
-    registry.register_tasks(
-        telecom_domain_get_tasks,
-        "telecom-workflow",
-        get_task_splits=telecom_domain_get_tasks_split,
-    )
 
     registry.register_domain(knowledge_domain_get_environment, "banking_knowledge")
     registry.register_tasks(knowledge_domain_get_tasks, "banking_knowledge")

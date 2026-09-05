@@ -46,7 +46,7 @@ class BaseRunConfig(BaseModel):
         str,
         Field(
             description="The domain to run the simulation on",
-            default="airline",
+            default="banking_knowledge",
         ),
     ]
     task_set_name: Annotated[
