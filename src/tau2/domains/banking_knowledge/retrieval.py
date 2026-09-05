@@ -56,7 +56,10 @@ PROMPTS_DIR = DATA_DIR / "tau2" / "domains" / "banking_knowledge" / "prompts"
 COMPONENTS_DIR = PROMPTS_DIR / "components"
 
 # Default variant used when no explicit retrieval_variant is provided.
-DEFAULT_RETRIEVAL_VARIANT = "alltools"
+# bm25_grep is BM25 keyword search + grep: fully local (rank-bm25), so the
+# default path needs no embedding API. `alltools` (the previous default)
+# required OpenAI text-embedding-3-large just to construct the environment.
+DEFAULT_RETRIEVAL_VARIANT = "bm25_grep"
 
 DEFAULT_DENSE_EMBEDDING_MODEL_OPENAI = "text-embedding-3-large"
 DEFAULT_DENSE_EMBEDDING_MODEL_OPENROUTER = "qwen3-embedding-8b"

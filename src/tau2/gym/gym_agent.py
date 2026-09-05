@@ -30,6 +30,7 @@ from tau2.environment.tool import Tool, as_tool
 from tau2.evaluator.evaluator import EvaluationType, evaluate_simulation
 from tau2.orchestrator.orchestrator import Orchestrator
 from tau2.registry import registry
+from tau2.runner.build import build_env_kwargs
 from tau2.user.user_simulator import DummyUser, UserSimulator
 from tau2.user.user_simulator_base import (
     OUT_OF_SCOPE,
@@ -593,13 +594,18 @@ class AgentGymEnv(gym.Env):
         user_llm: Optional[str] = None,
         user_llm_args: Optional[dict] = None,
         all_messages_as_observation: bool = False,
+        retrieval_config: Optional[str] = None,
+        retrieval_config_kwargs: Optional[dict] = None,
     ):
         """
         Initialize the Tau2 gym environment.
 
         Args:
-            domain: The domain name (e.g., 'retail', 'telecom', 'airline')
+            domain: The domain name (e.g., 'banking_knowledge', 'mock')
             task_id: The specific task ID to run within the domain
+            retrieval_config: Knowledge retrieval variant for banking_knowledge
+                (e.g. 'bm25'). Defaults to the domain's own default variant.
+            retrieval_config_kwargs: Extra kwargs for the retrieval variant.
         """
         self.domain = domain
         self.task_id = task_id
@@ -610,8 +616,12 @@ class AgentGymEnv(gym.Env):
             user_llm_args if user_llm_args else deepcopy(DEFAULT_LLM_ARGS_USER)
         )
         self.all_messages_as_observation = all_messages_as_observation
+        self.retrieval_config = retrieval_config
+        self.retrieval_config_kwargs = retrieval_config_kwargs
 
         self._lock = threading.Lock()
+        self._episode_env: Optional[Environment] = None
+        self._episode_task: Optional[Task] = None
         self._agent: Optional[GymAgent] = None
         self._user: Optional[UserSimulator] = None
         self._orchestrator: Optional[Orchestrator] = None
@@ -678,6 +688,10 @@ class AgentGymEnv(gym.Env):
             # Reset state
             self._simulation_run = None
             self._simulation_done.clear()
+            # Drop the previous episode's environment/task so this episode
+            # starts from freshly constructed, unmutated state.
+            self._episode_env = None
+            self._episode_task = None
 
             # Wait for any existing thread to finish
             if self._orchestrator_thread and self._orchestrator_thread.is_alive():
@@ -956,8 +970,24 @@ class AgentGymEnv(gym.Env):
 
         Raises:
             ValueError: If the domain is not registered in the registry
+
+        Note:
+            The environment is built once per episode and cached; ``reset()``
+            clears the cache so each episode starts from a fresh environment.
+            Without this the environment (and, for banking_knowledge, its
+            retrieval index) would be rebuilt three times per ``reset()``.
         """
-        return registry.get_env_constructor(self.domain)(solo_mode=self.solo_mode)
+        if self._episode_env is None:
+            env_kwargs = build_env_kwargs(
+                domain=self.domain,
+                task=self._get_task(),
+                retrieval_config=self.retrieval_config,
+                retrieval_config_kwargs=self.retrieval_config_kwargs,
+            )
+            self._episode_env = registry.get_env_constructor(self.domain)(
+                solo_mode=self.solo_mode, **env_kwargs
+            )
+        return self._episode_env
 
     def _get_task(self) -> Task:
         """
@@ -977,13 +1007,17 @@ class AgentGymEnv(gym.Env):
             ValueError: If no task is found with the specified task_id
                        for the given domain
         """
-        tasks = registry.get_tasks_loader(self.domain)()
-        for task in tasks:
-            if task.id == self.task_id:
-                return task
-        raise ValueError(
-            f"No task found with id {self.task_id} for domain {self.domain}"
-        )
+        if self._episode_task is None:
+            tasks = registry.get_tasks_loader(self.domain)()
+            for task in tasks:
+                if task.id == self.task_id:
+                    self._episode_task = task
+                    break
+            else:
+                raise ValueError(
+                    f"No task found with id {self.task_id} for domain {self.domain}"
+                )
+        return self._episode_task
 
     def _get_agent(self) -> GymAgent:
         """
@@ -1129,17 +1163,22 @@ class UserGymEnv(gym.Env):
         agent_llm: Optional[str] = None,
         agent_llm_args: Optional[dict] = None,
         all_messages_as_observation: bool = False,
+        retrieval_config: Optional[str] = None,
+        retrieval_config_kwargs: Optional[dict] = None,
     ):
         """
         Initialize the Tau2 user gym environment.
 
         Args:
-            domain: The domain name (e.g., 'retail', 'telecom', 'airline')
+            domain: The domain name (e.g., 'banking_knowledge', 'mock')
             task_id: The specific task ID to run within the domain
             max_steps: Maximum number of steps before truncation
             agent_llm: LLM to use for the automated agent (default: from config)
             agent_llm_args: Arguments to pass to the agent LLM
             all_messages_as_observation: If True, show all messages; if False, only show agent responses
+            retrieval_config: Knowledge retrieval variant for banking_knowledge
+                (e.g. 'bm25'). Defaults to the domain's own default variant.
+            retrieval_config_kwargs: Extra kwargs for the retrieval variant.
         """
         self.domain = domain
         self.task_id = task_id
@@ -1149,8 +1188,12 @@ class UserGymEnv(gym.Env):
             agent_llm_args if agent_llm_args else deepcopy(DEFAULT_LLM_ARGS_AGENT)
         )
         self.all_messages_as_observation = all_messages_as_observation
+        self.retrieval_config = retrieval_config
+        self.retrieval_config_kwargs = retrieval_config_kwargs
 
         self._lock = threading.Lock()
+        self._episode_env: Optional[Environment] = None
+        self._episode_task: Optional[Task] = None
         self._user: Optional[GymUser] = None
         self._agent: Optional[LLMAgent] = None
         self._orchestrator: Optional[Orchestrator] = None
@@ -1220,6 +1263,10 @@ class UserGymEnv(gym.Env):
             # Reset state
             self._simulation_run = None
             self._simulation_done.clear()
+            # Drop the previous episode's environment/task so this episode
+            # starts from freshly constructed, unmutated state.
+            self._episode_env = None
+            self._episode_task = None
 
             # Wait for any existing thread to finish
             if self._orchestrator_thread and self._orchestrator_thread.is_alive():
@@ -1451,8 +1498,21 @@ class UserGymEnv(gym.Env):
 
         Returns:
             An Environment instance configured for the specified domain.
+
+        Note:
+            Built once per episode and cached; ``reset()`` clears the cache.
         """
-        return registry.get_env_constructor(self.domain)(solo_mode=False)
+        if self._episode_env is None:
+            env_kwargs = build_env_kwargs(
+                domain=self.domain,
+                task=self._get_task(),
+                retrieval_config=self.retrieval_config,
+                retrieval_config_kwargs=self.retrieval_config_kwargs,
+            )
+            self._episode_env = registry.get_env_constructor(self.domain)(
+                solo_mode=False, **env_kwargs
+            )
+        return self._episode_env
 
     def _get_task(self) -> Task:
         """
@@ -1464,13 +1524,17 @@ class UserGymEnv(gym.Env):
         Raises:
             ValueError: If no task is found with the specified task_id
         """
-        tasks = registry.get_tasks_loader(self.domain)()
-        for task in tasks:
-            if task.id == self.task_id:
-                return task
-        raise ValueError(
-            f"No task found with id {self.task_id} for domain {self.domain}"
-        )
+        if self._episode_task is None:
+            tasks = registry.get_tasks_loader(self.domain)()
+            for task in tasks:
+                if task.id == self.task_id:
+                    self._episode_task = task
+                    break
+            else:
+                raise ValueError(
+                    f"No task found with id {self.task_id} for domain {self.domain}"
+                )
+        return self._episode_task
 
     def _get_agent(self) -> LLMAgent:
         """

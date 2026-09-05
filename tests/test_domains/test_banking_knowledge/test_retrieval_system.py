@@ -1165,11 +1165,16 @@ class TestAllToolsEmbedderWarmupMapping:
 
 
 class TestBankingKnowledgeRunConfigDefaults:
-    def test_text_run_config_defaults_retrieval_to_all_tools(self):
+    def test_text_run_config_defaults_retrieval_to_domain_default(self):
         from tau2.data_model.simulation import TextRunConfig
+        from tau2.domains.banking_knowledge.retrieval import (
+            DEFAULT_RETRIEVAL_VARIANT,
+        )
 
         cfg = TextRunConfig(domain="banking_knowledge")
-        assert cfg.retrieval_config == "alltools"
+        assert cfg.retrieval_config == DEFAULT_RETRIEVAL_VARIANT
+        # The default must not require an embedding API to construct.
+        assert cfg.retrieval_config == "bm25_grep"
 
     def test_explicit_retrieval_config_is_preserved(self):
         from tau2.data_model.simulation import TextRunConfig

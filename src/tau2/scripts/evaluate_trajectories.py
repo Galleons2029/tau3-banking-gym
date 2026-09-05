@@ -9,9 +9,10 @@ from loguru import logger
 from rich.console import Console
 from rich.progress import Progress
 
-from tau2.data_model.simulation import Results
+from tau2.data_model.simulation import Info, Results
 from tau2.evaluator.evaluator import EvaluationType, evaluate_simulation
 from tau2.metrics.agent_metrics import compute_metrics
+from tau2.runner.build import build_env_kwargs
 from tau2.utils.display import ConsoleDisplay
 from tau2.utils.io_utils import expand_paths
 
@@ -49,18 +50,27 @@ def _load_fresh_tasks(results: Results, console: Optional[Console] = None) -> Re
     return results
 
 
-def _build_eval_env_kwargs(domain: str, task) -> Optional[dict]:
+def _build_eval_env_kwargs(domain: str, task, info: Info) -> Optional[dict]:
     """Env kwargs needed so re-grading matches live grading for a domain.
 
-    banking_knowledge needs the per-task read_log_allowlist: without it the
-    required-read assertions (derived from the golden trajectory) silently
-    stop discriminating. Mirrors tau2.runner.build._build_env_kwargs.
-    """
-    if domain == "banking_knowledge":
-        from tau2.runner.build import _derive_read_log_allowlist
+    Delegates to tau2.runner.build.build_env_kwargs — the same function the
+    live runner uses — so re-grading builds the identical environment.
 
-        return {"read_log_allowlist": _derive_read_log_allowlist(task)}
-    return None
+    The retrieval variant is recovered from the results file's own ``Info``
+    (written by ``runner.helpers.get_info`` at run time), so the caller does
+    not have to restate it. Without it, banking_knowledge would be re-graded
+    against the domain's default variant rather than the one actually run.
+    banking_knowledge additionally needs the per-task read_log_allowlist:
+    without it the required-read assertions (derived from the golden
+    trajectory) silently stop discriminating.
+    """
+    env_kwargs = build_env_kwargs(
+        domain=domain,
+        task=task,
+        retrieval_config=info.retrieval_config,
+        retrieval_config_kwargs=info.retrieval_config_kwargs,
+    )
+    return env_kwargs or None
 
 
 def compute_simulation_rewards(
@@ -103,7 +113,7 @@ def compute_simulation_rewards(
                 simulation=simulation,
                 evaluation_type=evaluation_type,
                 solo_mode=solo_mode,
-                env_kwargs=_build_eval_env_kwargs(domain, task),
+                env_kwargs=_build_eval_env_kwargs(domain, task, results.info),
                 strict_replay=False,
             )
 

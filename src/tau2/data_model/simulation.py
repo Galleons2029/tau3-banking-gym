@@ -246,9 +246,18 @@ class BaseRunConfig(BaseModel):
 
     @model_validator(mode="after")
     def _default_banking_retrieval_config(self) -> "BaseRunConfig":
-        """Default retrieval_config to alltools for banking_knowledge."""
+        """Pin retrieval_config to the banking_knowledge default variant.
+
+        Resolved from the domain itself rather than restated here, so the
+        default has exactly one source of truth. Imported lazily: the domain
+        package imports this module, so a top-level import would cycle.
+        """
         if self.domain == "banking_knowledge" and self.retrieval_config is None:
-            object.__setattr__(self, "retrieval_config", "alltools")
+            from tau2.domains.banking_knowledge.retrieval import (
+                DEFAULT_RETRIEVAL_VARIANT,
+            )
+
+            object.__setattr__(self, "retrieval_config", DEFAULT_RETRIEVAL_VARIANT)
         return self
 
     @property

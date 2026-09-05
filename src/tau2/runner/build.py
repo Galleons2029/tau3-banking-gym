@@ -192,23 +192,41 @@ def _derive_read_log_allowlist(task: Task) -> set:
     return allowlist
 
 
-def _build_env_kwargs(config: RunConfig, task: Task) -> dict:
-    """Build env_kwargs from a RunConfig for the environment constructor.
+def build_env_kwargs(
+    domain: Optional[str],
+    task: Task,
+    retrieval_config: Optional[str] = None,
+    retrieval_config_kwargs: Optional[dict] = None,
+) -> dict:
+    """Build env_kwargs for a domain's environment constructor.
 
     Extracts retrieval-related config (banking_knowledge domain) and includes
     the task reference needed for golden_retrieval policy.
+
+    This is the single source of truth for env_kwargs: the batch runner
+    (via :func:`_build_env_kwargs`), the gym environments, and trajectory
+    re-grading all go through it so they cannot drift apart.
     """
     env_kwargs: dict = {}
-    retrieval_config = getattr(config, "retrieval_config", None)
     if retrieval_config is not None:
         env_kwargs["retrieval_variant"] = retrieval_config
         env_kwargs["task"] = task
-        rk = dict(getattr(config, "retrieval_config_kwargs", None) or {})
+        rk = dict(retrieval_config_kwargs or {})
         if rk:
             env_kwargs["retrieval_kwargs"] = rk
-    if getattr(config, "domain", None) == "banking_knowledge":
+    if domain == "banking_knowledge":
         env_kwargs["read_log_allowlist"] = _derive_read_log_allowlist(task)
     return env_kwargs
+
+
+def _build_env_kwargs(config: RunConfig, task: Task) -> dict:
+    """Build env_kwargs from a RunConfig. Thin adapter over :func:`build_env_kwargs`."""
+    return build_env_kwargs(
+        domain=getattr(config, "domain", None),
+        task=task,
+        retrieval_config=getattr(config, "retrieval_config", None),
+        retrieval_config_kwargs=getattr(config, "retrieval_config_kwargs", None),
+    )
 
 
 def build_text_orchestrator(
