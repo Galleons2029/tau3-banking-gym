@@ -2,7 +2,7 @@
 """
 Minimal custom agent example.
 
-This example shows how to create the simplest possible tau2 agent,
+This example shows how to create the simplest possible tau3 agent,
 register it, and run it against the mock domain -- all in one file.
 
 No API keys are needed (uses the mock domain with a real LLM).
@@ -12,23 +12,23 @@ Usage:
 
 What this does:
     1. Defines a custom agent that wraps an LLM with a system prompt
-    2. Registers it with the tau2 registry
+    2. Registers it with the tau3 registry
     3. Runs it on a single mock task
     4. Prints the result
 """
 
 from typing import Optional
 
-from tau2.agent.base_agent import HalfDuplexAgent
-from tau2.data_model.message import (
+from tau3.agent.base_agent import HalfDuplexAgent
+from tau3.data_model.message import (
     APICompatibleMessage,
     AssistantMessage,
     Message,
     SystemMessage,
     UserMessage,
 )
-from tau2.environment.toolkit import Tool
-from tau2.utils.llm_utils import generate
+from tau3.environment.toolkit import Tool
+from tau3.utils.llm_utils import generate
 
 # =============================================================================
 # Step 1: Define your agent
@@ -50,7 +50,7 @@ class MinimalAgentState:
 class MinimalAgent(HalfDuplexAgent[MinimalAgentState]):
     """A minimal agent that uses an LLM to respond to messages.
 
-    The state holds the conversation history as tau2 Message objects,
+    The state holds the conversation history as tau3 Message objects,
     which is the format expected by the generate() utility.
     """
 
@@ -86,7 +86,7 @@ class MinimalAgent(HalfDuplexAgent[MinimalAgentState]):
         # Add the incoming message to state
         state.messages.append(message)
 
-        # Call the LLM with tools (generate expects tau2 Message objects)
+        # Call the LLM with tools (generate expects tau3 Message objects)
         response = generate(
             model=self.llm,
             tools=self.tools,
@@ -125,9 +125,9 @@ def create_minimal_agent(tools, domain_policy, **kwargs):
 # =============================================================================
 
 if __name__ == "__main__":
-    from tau2.data_model.simulation import TextRunConfig
-    from tau2.registry import registry
-    from tau2.runner import get_tasks, run_single_task
+    from tau3.data_model.simulation import TextRunConfig
+    from tau3.registry import registry
+    from tau3.runner import get_tasks, run_single_task
 
     # Register our agent
     registry.register_agent_factory(create_minimal_agent, "minimal_agent")

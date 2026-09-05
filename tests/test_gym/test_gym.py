@@ -1,6 +1,6 @@
 import pytest
 
-from tau2.gym.gym_agent import AgentGymEnv, GymAgent, TauSpace
+from tau3.gym.gym_agent import AgentGymEnv, GymAgent, TauSpace
 
 from .utils import timeout
 

@@ -2,15 +2,15 @@ from copy import deepcopy
 
 import pytest
 
-from tau2.config import (
+from tau3.config import (
     DEFAULT_LLM_AGENT,
     DEFAULT_LLM_ARGS_AGENT,
     DEFAULT_LLM_ARGS_USER,
     DEFAULT_LLM_USER,
 )
-from tau2.data_model.simulation import RunConfig, TextRunConfig
-from tau2.data_model.tasks import EnvAssertion, RewardType, Task, make_task
-from tau2.run import (
+from tau3.data_model.simulation import RunConfig, TextRunConfig
+from tau3.data_model.tasks import EnvAssertion, RewardType, Task, make_task
+from tau3.run import (
     EvaluationType,
     get_options,
     get_tasks,

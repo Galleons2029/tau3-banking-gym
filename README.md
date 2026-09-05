@@ -23,9 +23,9 @@ Knowledge retrieval · 75+ task fixes<br>
 
 ## What's New in $\tau^3$-bench
 
-> **📢 July 2026 — v1.0.1 grading update:** This release fixes a couple of `banking_knowledge` task errors. Scores on that domain change as a result — **results produced with tau2-bench < 1.0.1 are not comparable with >= 1.0.1**, and affected leaderboard submissions have been re-graded. Old results files can be re-scored with `tau2 evaluate-trajs --fresh-tasks`; to reproduce pre-fix behavior, pin the [`pre-v1.0.1`](https://github.com/sierra-research/tau2-bench/releases/tag/pre-v1.0.1) tag. Details in the [changelog](CHANGELOG.md) and [release notes](RELEASE_NOTES.md). Other domains are unaffected.
+> **📢 July 2026 — v1.0.1 grading update:** This release fixes a couple of `banking_knowledge` task errors. Scores on that domain change as a result — **results produced with tau2-bench < 1.0.1 are not comparable with >= 1.0.1**, and affected leaderboard submissions have been re-graded. Old results files can be re-scored with `tau3 evaluate-trajs --fresh-tasks`; to reproduce pre-fix behavior, pin the [`pre-v1.0.1`](https://github.com/sierra-research/tau2-bench/releases/tag/pre-v1.0.1) tag. Details in the [changelog](CHANGELOG.md) and [release notes](RELEASE_NOTES.md). Other domains are unaffected.
 
-- **Knowledge Domain (`banking_knowledge`)** — A knowledge-retrieval-based customer service domain with configurable RAG pipelines, document search, embeddings, and agentic shell-based search. [Learn more →](src/tau2/knowledge/README.md)
+- **Knowledge Domain (`banking_knowledge`)** — A knowledge-retrieval-based customer service domain with configurable RAG pipelines, document search, embeddings, and agentic shell-based search. [Learn more →](src/tau3/knowledge/README.md)
 - **Task Quality (75+ fixes)** — Removed incorrect expected actions, clarified ambiguous instructions, fixed impossible constraints, and added missing fallback behaviors across airline, retail, and banking domains. Based on analysis from [SABER](https://arxiv.org/abs/2512.07850) (Cuadron et al., 2025). [Learn more →](https://taubench.com/blog/tau3-task-fixes.html)
 - **Updated Leaderboard** — Now includes knowledge results. Compare model performance at [taubench.com](https://taubench.com). [Submit your results →](docs/leaderboard-submission.md)
 
@@ -78,13 +78,13 @@ cp .env.example .env
 ### 3. Run an evaluation
 
 ```bash
-tau2 run --domain banking_knowledge --agent-llm gpt-4.1 --user-llm gpt-4.1 \
+tau3 run --domain banking_knowledge --agent-llm gpt-4.1 --user-llm gpt-4.1 \
   --num-trials 1 --num-tasks 5
 ```
 
-Results are saved to `data/simulations/`. Use `tau2 view` to browse them.
+Results are saved to `data/simulations/`. Use `tau3 view` to browse them.
 
-> **Tip**: Run `tau2 intro` for an overview of available domains, commands, and examples.
+> **Tip**: Run `tau3 intro` for an overview of available domains, commands, and examples.
 
 ## Documentation
 
@@ -93,28 +93,28 @@ Results are saved to `data/simulations/`. Use `tau2 view` to browse them.
 | Document | Description |
 |----------|-------------|
 | [Getting Started](docs/getting-started.md) | Installation, API keys, first run, output structure, configuration |
-| [CLI Reference](docs/cli-reference.md) | All `tau2` commands and options |
+| [CLI Reference](docs/cli-reference.md) | All `tau3` commands and options |
 
 ### Core Concepts
 
 | Document | Description |
 |----------|-------------|
-| [Agent Developer Guide](src/tau2/agent/README.md) | Build and evaluate your own agent |
-| [Domains](src/tau2/domains/README.md) | Domain structure, data format, and available domains |
-| [Orchestrator](src/tau2/orchestrator/README.md) | Half-duplex (turn-based) orchestration |
+| [Agent Developer Guide](src/tau3/agent/README.md) | Build and evaluate your own agent |
+| [Domains](src/tau3/domains/README.md) | Domain structure, data format, and available domains |
+| [Orchestrator](src/tau3/orchestrator/README.md) | Half-duplex (turn-based) orchestration |
 | [Task Schema & Evaluation](docs/evaluation.md) | What `evaluation_criteria.actions` means, how `reward_basis` gates the reward, and how to inspect action correctness |
 
 ### Knowledge Retrieval
 
 | Document | Description |
 |----------|-------------|
-| [Knowledge Retrieval](src/tau2/knowledge/README.md) | Retrieval pipeline configs, embeddings, RAG, and sandbox setup for the `banking_knowledge` domain |
+| [Knowledge Retrieval](src/tau3/knowledge/README.md) | Retrieval pipeline configs, embeddings, RAG, and sandbox setup for the `banking_knowledge` domain |
 
 ### RL & Training
 
 | Document | Description |
 |----------|-------------|
-| [Gym Interface](src/tau2/gym/README.md) | Gymnasium-compatible environment, play mode, train/test splits |
+| [Gym Interface](src/tau3/gym/README.md) | Gymnasium-compatible environment, play mode, train/test splits |
 
 ### Leaderboard & Experiments
 
@@ -153,7 +153,7 @@ If you use a specific component of $\tau^3$-bench, please cite the corresponding
 
 ```bibtex
 
-@misc{barres2025tau2,
+@misc{barres2025tau3,
       title={$\tau^2$-Bench: Evaluating Conversational Agents in a Dual-Control Environment}, 
       author={Victor Barres and Honghua Dong and Soham Ray and Xujie Si and Karthik Narasimhan},
       year={2025},

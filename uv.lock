@@ -1732,7 +1732,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tau2"
+name = "tau3"
 version = "1.0.1"
 source = { editable = "." }
 dependencies = [
@@ -1819,7 +1819,7 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'experiments'", specifier = ">=1.6.1" },
     { name = "seaborn", marker = "extra == 'experiments'", specifier = ">=0.13.2" },
     { name = "tabulate", specifier = ">=0.9.0" },
-    { name = "tau2", extras = ["knowledge", "gym", "dev", "experiments"], marker = "extra == 'all'" },
+    { name = "tau3", extras = ["knowledge", "gym", "dev", "experiments"], marker = "extra == 'all'" },
     { name = "tenacity", specifier = ">=9.0.0" },
     { name = "toml", specifier = ">=0.10.2" },
     { name = "typer", specifier = ">=0.12.5" },

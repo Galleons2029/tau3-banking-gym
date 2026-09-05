@@ -15,16 +15,16 @@ Usage:
 
 from typing import Optional
 
-from tau2.agent.base_agent import HalfDuplexAgent
-from tau2.data_model.message import (
+from tau3.agent.base_agent import HalfDuplexAgent
+from tau3.data_model.message import (
     APICompatibleMessage,
     AssistantMessage,
     Message,
     SystemMessage,
     UserMessage,
 )
-from tau2.environment.toolkit import Tool
-from tau2.utils.llm_utils import generate
+from tau3.environment.toolkit import Tool
+from tau3.utils.llm_utils import generate
 
 # =============================================================================
 # A slightly more sophisticated agent
@@ -103,9 +103,9 @@ class VerboseAgent(HalfDuplexAgent[list]):
 # =============================================================================
 
 if __name__ == "__main__":
-    from tau2.evaluator.evaluator import EvaluationType
-    from tau2.orchestrator.orchestrator import Orchestrator
-    from tau2.runner import (
+    from tau3.evaluator.evaluator import EvaluationType
+    from tau3.orchestrator.orchestrator import Orchestrator
+    from tau3.runner import (
         build_environment,
         build_user,
         get_tasks,

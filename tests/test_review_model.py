@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-from tau2.evaluator import reviewer
-from tau2.runner import batch
+from tau3.evaluator import reviewer
+from tau3.runner import batch
 
 
 def test_review_simulation_uses_custom_model_for_full_turn_based(monkeypatch):

@@ -1,8 +1,8 @@
 """Shared fixtures for task tests in the knowledge domain."""
 
-from tau2.domains.banking_knowledge.data_model import DatabaseTable, TransactionalDB
-from tau2.domains.banking_knowledge.tools import KnowledgeTools, KnowledgeUserTools
-from tau2.environment.environment import Environment
+from tau3.domains.banking_knowledge.data_model import DatabaseTable, TransactionalDB
+from tau3.domains.banking_knowledge.tools import KnowledgeTools, KnowledgeUserTools
+from tau3.environment.environment import Environment
 
 
 def create_amara_db(auto_resolve: bool = True) -> TransactionalDB:

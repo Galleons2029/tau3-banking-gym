@@ -109,7 +109,7 @@ cd tau2-bench
 uv sync --extra dev
 
 # Verify installation
-uv run tau2 check-data
+uv run tau3 check-data
 ```
 
 Install additional extras as needed for the area you're working on:
@@ -272,12 +272,12 @@ For `src/experiments/` contributions:
 
 There are two types of agent contributions:
 
-#### Core Agents (`src/tau2/agent/`)
-Core agents are part of the official tau2 framework and are maintained by Sierra. Core agent contributions:
+#### Core Agents (`src/tau3/agent/`)
+Core agents are part of the official tau3 framework and are maintained by Sierra. Core agent contributions:
 - Require thorough review and approval
 - Must implement `HalfDuplexAgent`
-- Are registered in `src/tau2/registry.py`
-- See `src/tau2/agent/README.md` for the full developer guide
+- Are registered in `src/tau3/registry.py`
+- See `src/tau3/agent/README.md` for the full developer guide
 
 
 ## 🤝 Getting Help

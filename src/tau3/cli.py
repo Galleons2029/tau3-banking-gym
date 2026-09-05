@@ -1,0 +1,968 @@
+import argparse
+import json
+
+from tau3.config import (
+    DEFAULT_AGENT_IMPLEMENTATION,
+    DEFAULT_LLM_AGENT,
+    DEFAULT_LLM_EVAL_USER_SIMULATOR,
+    DEFAULT_LLM_LOG_MODE,
+    DEFAULT_LLM_TEMPERATURE_AGENT,
+    DEFAULT_LLM_TEMPERATURE_USER,
+    DEFAULT_LLM_USER,
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_MAX_CONCURRENCY,
+    DEFAULT_MAX_ERRORS,
+    DEFAULT_MAX_STEPS,
+    DEFAULT_NUM_TRIALS,
+    DEFAULT_RETRY_ATTEMPTS,
+    DEFAULT_RETRY_MIN_WAIT,
+    DEFAULT_SEED,
+    DEFAULT_USER_IMPLEMENTATION,
+)
+from tau3.data_model.persona import PersonaConfig
+from tau3.data_model.simulation import TextRunConfig
+from tau3.domains.banking_knowledge.retrieval import get_all_variant_names
+from tau3.run import get_options, run_domain
+from tau3.runner.work import parse_provider_limits
+
+
+def get_all_retrieval_config_names():
+    return get_all_variant_names()
+
+
+def add_run_args(parser):
+    """Add run arguments to a parser."""
+    domains = get_options().domains
+    parser.add_argument(
+        "--domain",
+        "-d",
+        type=str,
+        choices=domains,
+        help="The domain to run the simulation on",
+    )
+    parser.add_argument(
+        "--num-trials",
+        type=int,
+        default=DEFAULT_NUM_TRIALS,
+        help="The number of times each task is run. Default is 1.",
+    )
+    parser.add_argument(
+        "--agent",
+        type=str,
+        default=DEFAULT_AGENT_IMPLEMENTATION,
+        choices=get_options().agents,
+        help=f"The agent implementation to use. Default is {DEFAULT_AGENT_IMPLEMENTATION}.",
+    )
+    parser.add_argument(
+        "--agent-llm",
+        type=str,
+        default=DEFAULT_LLM_AGENT,
+        help=f"The LLM to use for the agent. Default is {DEFAULT_LLM_AGENT}.",
+    )
+    parser.add_argument(
+        "--agent-llm-args",
+        type=json.loads,
+        default={"temperature": DEFAULT_LLM_TEMPERATURE_AGENT},
+        help=f"The arguments to pass to the LLM for the agent. Default is '{{\"temperature\": {DEFAULT_LLM_TEMPERATURE_AGENT}}}'.",
+    )
+    parser.add_argument(
+        "--user",
+        type=str,
+        choices=get_options().users,
+        default=DEFAULT_USER_IMPLEMENTATION,
+        help=f"The user implementation to use. Default is {DEFAULT_USER_IMPLEMENTATION}.",
+    )
+    parser.add_argument(
+        "--user-llm",
+        type=str,
+        default=DEFAULT_LLM_USER,
+        help=f"The LLM to use for the user. Default is {DEFAULT_LLM_USER}.",
+    )
+    parser.add_argument(
+        "--user-llm-args",
+        type=json.loads,
+        default={"temperature": DEFAULT_LLM_TEMPERATURE_USER},
+        help=f"The arguments to pass to the LLM for the user. Default is '{{\"temperature\": {DEFAULT_LLM_TEMPERATURE_USER}}}'.",
+    )
+    parser.add_argument(
+        "--task-set-name",
+        type=str,
+        default=None,
+        choices=get_options().task_sets,
+        help="The task set to run the simulation on. If not provided, will load default task set for the domain.",
+    )
+    parser.add_argument(
+        "--task-split-name",
+        type=str,
+        default="base",
+        help="The task split to run the simulation on. If not provided, will load 'base' split.",
+    )
+    parser.add_argument(
+        "--task-ids",
+        type=str,
+        nargs="+",
+        help="(Optional) run only the tasks with the given IDs. If not provided, will run all tasks.",
+    )
+    parser.add_argument(
+        "--num-tasks",
+        type=int,
+        default=None,
+        help="The number of tasks to run.",
+    )
+    parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=DEFAULT_MAX_STEPS,
+        help=f"The maximum number of steps to run the simulation. Default is {DEFAULT_MAX_STEPS}.",
+    )
+    parser.add_argument(
+        "--max-errors",
+        type=int,
+        default=DEFAULT_MAX_ERRORS,
+        help=f"The maximum number of tool errors allowed in a row in the simulation. Default is {DEFAULT_MAX_ERRORS}.",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=None,
+        help="Maximum wallclock time in seconds for each simulation. No timeout by default.",
+    )
+    parser.add_argument(
+        "--save-to",
+        type=str,
+        required=False,
+        help="The path to save the simulation results. Will be saved to data/simulations/<save_to>/results.json. If not provided, will save to <timestamp>_<domain>_<agent>_<user>. If the file already exists, it will try to resume the run.",
+    )
+    parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=DEFAULT_MAX_CONCURRENCY,
+        help=f"The maximum number of concurrent simulations to run. Default is {DEFAULT_MAX_CONCURRENCY}. "
+        "With --workers, this is the number of simulations each worker process holds.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=0,
+        help="Number of worker processes to spawn. 0 (default) runs simulations in this "
+        "process. N > 0 makes this process a controller that schedules and checkpoints "
+        "while N worker processes execute (N x --max-concurrency simulations in flight); "
+        "use when scaling beyond the single-process concurrency ceiling.",
+    )
+    parser.add_argument(
+        "--provider-limit",
+        type=str,
+        default=None,
+        help='Per-provider concurrency caps in controller mode, e.g. "openai=40,gemini=20". '
+        "Requires --workers.",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=DEFAULT_SEED,
+        help=f"The seed to use for the simulation. Default is {DEFAULT_SEED}.",
+    )
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default=DEFAULT_LOG_LEVEL,
+        help=f"The log level to use for the simulation. Default is {DEFAULT_LOG_LEVEL}.",
+    )
+    parser.add_argument(
+        "--verbose-logs",
+        action="store_true",
+        default=False,
+        help="Enable verbose logging: saves LLM call logs and per-task logs. "
+        "Files are saved to the save directory (auto-generated if --save-to not specified).",
+    )
+    parser.add_argument(
+        "--llm-log-mode",
+        type=str,
+        choices=["all", "latest"],
+        default=DEFAULT_LLM_LOG_MODE,
+        help="LLM debug logging mode. Only takes effect when --verbose-logs is enabled. "
+        "'all' saves every LLM call (can generate many files), "
+        "'latest' keeps only the most recent call of each type (saves space). "
+        f"Default is '{DEFAULT_LLM_LOG_MODE}'. Ignored if --verbose-logs is not specified.",
+    )
+    parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=DEFAULT_RETRY_ATTEMPTS,
+        help=f"Maximum number of retries for failed tasks. Default is {DEFAULT_RETRY_ATTEMPTS}.",
+    )
+    parser.add_argument(
+        "--retry-delay",
+        type=float,
+        default=DEFAULT_RETRY_MIN_WAIT,
+        help=f"Delay in seconds between retries. Default is {DEFAULT_RETRY_MIN_WAIT}.",
+    )
+    parser.add_argument(
+        "--enforce-communication-protocol",
+        action="store_true",
+        default=False,
+        help="Enforce communication protocol rules (e.g., no mixed messages with text and tool calls). Default is False.",
+    )
+    parser.add_argument(
+        "--user-persona",
+        type=json.loads,
+        default=None,
+        help="User persona config as JSON dict. Supports explicit values or weighted probabilities. "
+        'Examples: \'{"verbosity": "minimal"}\', '
+        '\'{"verbosity": {"minimal": 0.8, "standard": 0.2}}\'. '
+        "If not provided, uses default behavior (standard verbosity).",
+    )
+
+    # Knowledge domain arguments
+    parser.add_argument(
+        "--retrieval-config",
+        type=str,
+        default=None,
+        choices=sorted(get_all_retrieval_config_names()),
+        help=(
+            "Knowledge retrieval config name (banking_knowledge domain). "
+            "Offline: no_knowledge, full_kb, golden_retrieval, bm25, bm25_grep, grep_only. "
+            "Requires OPENAI_API_KEY: openai_embeddings*, alltools. "
+            "Requires OPENROUTER_API_KEY: qwen_embeddings*, alltools-qwen. "
+            "Requires sandbox-runtime: terminal_use*, alltools, alltools-qwen. "
+            "Default for banking_knowledge: bm25_grep (BM25 + grep, fully offline)."
+        ),
+    )
+    parser.add_argument(
+        "--retrieval-config-kwargs",
+        type=json.loads,
+        default=None,
+        help="Arguments to pass to the retrieval config constructor as JSON (e.g., '{\"top_k\": 10}').",
+    )
+
+    # Resume mode
+    parser.add_argument(
+        "--auto-resume",
+        action="store_true",
+        default=False,
+        help="Automatically resume from existing save file without prompting (for non-interactive runs).",
+    )
+
+    # Auto-review mode
+    parser.add_argument(
+        "--auto-review",
+        action="store_true",
+        default=False,
+        help="Automatically run LLM conversation review after each simulation.",
+    )
+    parser.add_argument(
+        "--review-mode",
+        type=str,
+        choices=["full", "user"],
+        default="full",
+        help="Review mode when --auto-review is enabled: 'full' (agent+user errors, default) or 'user' (user simulator only).",
+    )
+    parser.add_argument(
+        "--review-model",
+        type=str,
+        default=DEFAULT_LLM_EVAL_USER_SIMULATOR,
+        help=f"LLM model to use for review calls. Default is {DEFAULT_LLM_EVAL_USER_SIMULATOR}.",
+    )
+
+
+def _get_version() -> str:
+    from tau3.utils.utils import get_tau2_version
+
+    return get_tau2_version()
+
+
+def run_intro():
+    """Display a rich intro page describing what tau-bench can do."""
+    from rich import box
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
+
+    console = Console()
+    version = _get_version()
+
+    # ── Banner ──────────────────────────────────────────────────────────
+    banner = Text(justify="center")
+    banner.append("\n")
+    banner.append("tau3-banking-gym", style="bold cyan")
+    banner.append(f"  v{version}\n", style="dim")
+    banner.append(
+        "A half-duplex agent gym for evaluating\n"
+        "conversational customer-service agents\n",
+        style="italic",
+    )
+    console.print(
+        Panel(
+            banner,
+            border_style="cyan",
+            padding=(1, 4),
+        )
+    )
+
+    # ── Modes ───────────────────────────────────────────────────────────
+    modes_table = Table(
+        title="Communication Modes",
+        box=box.SIMPLE_HEAVY,
+        title_style="bold magenta",
+        show_edge=False,
+        pad_edge=False,
+        padding=(0, 2),
+    )
+    modes_table.add_column("Mode", style="bold", no_wrap=True)
+    modes_table.add_column("Description")
+    modes_table.add_row(
+        "Half-duplex (text)",
+        "Turn-based text conversations. Agent and user take turns exchanging messages.",
+    )
+    console.print(modes_table)
+    console.print()
+
+    # ── Domains ─────────────────────────────────────────────────────────
+    domain_table = Table(
+        title="Domains",
+        box=box.SIMPLE_HEAVY,
+        title_style="bold magenta",
+        show_edge=False,
+        pad_edge=False,
+        padding=(0, 2),
+    )
+    domain_table.add_column("Domain", style="bold", no_wrap=True)
+    domain_table.add_column("Description")
+    domain_table.add_row(
+        "banking_knowledge",
+        "Knowledge-retrieval-based customer service with configurable RAG pipelines",
+    )
+    domain_table.add_row("mock", "Lightweight test domain for development")
+    console.print(domain_table)
+    console.print()
+
+    # ── Commands ────────────────────────────────────────────────────────
+    cmd_table = Table(
+        title="Commands",
+        box=box.SIMPLE_HEAVY,
+        title_style="bold magenta",
+        show_edge=False,
+        pad_edge=False,
+        padding=(0, 2),
+    )
+    cmd_table.add_column("Command", style="bold green", no_wrap=True)
+    cmd_table.add_column("What it does")
+    cmd_table.add_row("tau3 run", "Run a benchmark evaluation against a domain")
+    cmd_table.add_row("tau3 view", "Browse and inspect simulation results")
+    cmd_table.add_row(
+        "tau3 play", "Interactive manual mode \u2014 play the agent yourself"
+    )
+    cmd_table.add_row("tau3 domain <name>", "Show detailed documentation for a domain")
+    cmd_table.add_row("tau3 leaderboard", "Display the current leaderboard")
+    cmd_table.add_row(
+        "tau3 review <path>", "Run LLM-based conversation review on results"
+    )
+    cmd_table.add_row(
+        "tau3 evaluate-trajs <paths>", "Re-evaluate trajectories and recompute rewards"
+    )
+    cmd_table.add_row("tau3 submit prepare", "Prepare a leaderboard submission")
+    cmd_table.add_row("tau3 submit validate", "Validate a submission directory")
+    cmd_table.add_row("tau3 check-data", "Verify data directory is set up correctly")
+    cmd_table.add_row("tau3 start", "Start background servers")
+    cmd_table.add_row("tau3 intro", "Show this page")
+    console.print(cmd_table)
+    console.print()
+
+    # ── Quick Start ─────────────────────────────────────────────────────
+    from rich.syntax import Syntax
+
+    quick_start = (
+        "# 1. Verify your setup\n"
+        "tau3 check-data\n"
+        "\n"
+        "# 2. Run a text (half-duplex) evaluation\n"
+        "tau3 run --domain banking_knowledge --retrieval-config bm25 "
+        "--agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 1 --num-tasks 5\n"
+        "\n"
+        "# 3. Browse results\n"
+        "tau3 view\n"
+        "\n"
+        "# 5. Check the leaderboard\n"
+        "tau3 leaderboard"
+    )
+    console.print(
+        Panel(
+            Syntax(quick_start, "bash", theme="monokai", line_numbers=False),
+            title="[bold yellow]Quick Start[/bold yellow]",
+            border_style="yellow",
+            padding=(1, 2),
+        )
+    )
+
+    # ── Tip ─────────────────────────────────────────────────────────────
+    console.print(
+        "\n[dim]Tip: Run any command with [bold]--help[/bold] for detailed usage, "
+        "e.g. [bold green]tau3 run --help[/bold green][/dim]\n"
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="tau3 — half-duplex agent gym for the banking_knowledge domain"
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Run command
+    run_parser = subparsers.add_parser("run", help="Run a benchmark")
+    add_run_args(run_parser)
+
+    def run_command(args):
+        user_persona_config = None
+        if args.user_persona:
+            user_persona_config = PersonaConfig.from_dict(args.user_persona)  # noqa: F841
+
+        # Set global LLM log mode (used by verbose logging)
+        from tau3.utils.llm_utils import set_llm_log_mode
+
+        set_llm_log_mode(args.llm_log_mode)
+
+        # Shared config kwargs
+        shared_kwargs = dict(
+            domain=args.domain,
+            task_set_name=args.task_set_name,
+            task_split_name=args.task_split_name,
+            task_ids=args.task_ids,
+            num_tasks=args.num_tasks,
+            llm_user=args.user_llm,
+            llm_args_user=args.user_llm_args,
+            num_trials=args.num_trials,
+            max_errors=args.max_errors,
+            timeout=args.timeout,
+            save_to=args.save_to,
+            max_concurrency=args.max_concurrency,
+            workers=args.workers,
+            provider_limits=parse_provider_limits(args.provider_limit),
+            seed=args.seed,
+            log_level=args.log_level,
+            verbose_logs=args.verbose_logs,
+            max_retries=args.max_retries,
+            retry_delay=args.retry_delay,
+            auto_resume=args.auto_resume,
+            auto_review=args.auto_review,
+            review_mode=args.review_mode,
+            review_model=args.review_model,
+            retrieval_config=args.retrieval_config,
+            retrieval_config_kwargs=args.retrieval_config_kwargs,
+        )
+
+        config = TextRunConfig(
+            **shared_kwargs,
+            agent=args.agent,
+            llm_agent=args.agent_llm,
+            llm_args_agent=args.agent_llm_args,
+            user=args.user,
+            max_steps=args.max_steps,
+            enforce_communication_protocol=args.enforce_communication_protocol,
+        )
+
+        return run_domain(config)
+
+    run_parser.set_defaults(func=run_command)
+
+    # Play command
+    play_parser = subparsers.add_parser(
+        "play", help="Play manual mode - interact with a domain as the agent"
+    )
+    play_parser.set_defaults(func=lambda args: run_manual_mode())
+
+    # View command
+    view_parser = subparsers.add_parser("view", help="View simulation results")
+    view_parser.add_argument(
+        "--dir",
+        type=str,
+        help="Directory containing simulation files. Defaults to data/simulations if not specified.",
+    )
+    view_parser.add_argument(
+        "--file",
+        type=str,
+        help="Path to the simulation results file to view",
+    )
+    view_parser.add_argument(
+        "--only-show-failed",
+        action="store_true",
+        help="Only show failed tasks.",
+    )
+    view_parser.add_argument(
+        "--only-show-all-failed",
+        action="store_true",
+        help="Only show tasks that failed in all trials.",
+    )
+    view_parser.add_argument(
+        "--max-tool-result-chars",
+        type=int,
+        default=500,
+        help="Truncate tool results (e.g. retrieved knowledge articles) to this many characters. Default: 500.",
+    )
+    view_parser.add_argument(
+        "--full-tool-results",
+        action="store_true",
+        help="Show full tool results without truncation.",
+    )
+    view_parser.set_defaults(func=lambda args: run_view_simulations(args))
+
+    # Domain command
+    domain_parser = subparsers.add_parser("domain", help="Show domain documentation")
+    domain_parser.add_argument(
+        "domain",
+        type=str,
+        help="Name of the domain to show documentation for (e.g., 'banking_knowledge', 'mock')",
+    )
+    domain_parser.set_defaults(func=lambda args: run_show_domain(args))
+
+    # Start command
+    start_parser = subparsers.add_parser("start", help="Start all servers")
+    start_parser.set_defaults(func=lambda args: run_start_servers())
+
+    # Worker command (executes simulations for a `tau3 run --workers N` controller)
+    worker_parser = subparsers.add_parser(
+        "worker",
+        help="Run a worker process that executes simulations for a tau3 controller "
+        "(see `tau3 run --workers`).",
+    )
+    worker_parser.add_argument(
+        "--controller",
+        type=str,
+        required=True,
+        help="Controller base URL, e.g. http://127.0.0.1:8321",
+    )
+    worker_parser.add_argument(
+        "--slots",
+        type=int,
+        default=10,
+        help="Concurrent simulations this worker holds (default: 10).",
+    )
+    worker_parser.add_argument(
+        "--worker-id",
+        type=str,
+        default=None,
+        help="Worker identity in controller logs (default: hostname-pid).",
+    )
+
+    def worker_command(args):
+        from tau3.runner.worker import run_worker_command
+
+        return run_worker_command(
+            controller=args.controller, slots=args.slots, worker_id=args.worker_id
+        )
+
+    worker_parser.set_defaults(func=worker_command)
+
+    # Intro command
+    intro_parser = subparsers.add_parser(
+        "intro", help="Show an overview of tau-bench and available commands"
+    )
+    intro_parser.set_defaults(func=lambda args: run_intro())
+
+    # Check data command
+    check_data_parser = subparsers.add_parser(
+        "check-data", help="Check if data directory is properly configured"
+    )
+    check_data_parser.set_defaults(func=lambda args: run_check_data())
+
+    # Evaluate trajectories command
+    evaluate_parser = subparsers.add_parser(
+        "evaluate-trajs", help="Evaluate trajectories and update rewards"
+    )
+    evaluate_parser.add_argument(
+        "paths",
+        nargs="+",
+        help="Paths to trajectory files, directories, or glob patterns",
+    )
+    evaluate_parser.add_argument(
+        "-o",
+        "--output-dir",
+        help="Directory to save updated trajectory files with recomputed rewards. If not provided, only displays metrics.",
+    )
+    evaluate_parser.add_argument(
+        "--fresh-tasks",
+        action="store_true",
+        help="Re-grade against the current task definitions from the data directory instead of the ones embedded in each results file.",
+    )
+    evaluate_parser.set_defaults(func=lambda args: run_evaluate_trajectories(args))
+
+    # Review command - LLM-based conversation review
+    review_parser = subparsers.add_parser(
+        "review", help="Run LLM-based conversation review on simulation results"
+    )
+    review_parser.add_argument(
+        "path",
+        help="Path to a results.json file or a directory containing results.json files",
+    )
+    review_parser.add_argument(
+        "-m",
+        "--mode",
+        type=str,
+        choices=["full", "user"],
+        default="full",
+        help="Review mode: 'full' (agent+user, default) or 'user' (user simulator only)",
+    )
+    review_parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default=None,
+        help="Output path for the reviewed results (only used for single file)",
+    )
+    review_parser.add_argument(
+        "--show-details",
+        action="store_true",
+        help="Show detailed review results for each simulation",
+    )
+    review_parser.add_argument(
+        "-c",
+        "--max-concurrency",
+        type=int,
+        default=32,
+        help="Maximum number of concurrent reviews (default: 32)",
+    )
+    review_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Limit review to first N simulations",
+    )
+    review_parser.add_argument(
+        "--task-ids",
+        type=str,
+        nargs="+",
+        default=None,
+        help="Only review simulations for these task IDs",
+    )
+    review_parser.add_argument(
+        "--log-llm",
+        action="store_true",
+        help="Log LLM request/response for each review call",
+    )
+    review_parser.add_argument(
+        "--review-model",
+        type=str,
+        default=DEFAULT_LLM_EVAL_USER_SIMULATOR,
+        help=f"LLM model to use for review calls. Default is {DEFAULT_LLM_EVAL_USER_SIMULATOR}.",
+    )
+    review_parser.set_defaults(func=lambda args: run_review(args))
+
+    # Leaderboard command
+    leaderboard_parser = subparsers.add_parser(
+        "leaderboard", help="Show the tau-bench leaderboard"
+    )
+    leaderboard_parser.add_argument(
+        "--domain",
+        "-d",
+        type=str,
+        choices=["retail", "airline", "telecom", "banking_knowledge"],
+        default=None,
+        help="Show leaderboard for a specific domain. If not specified, shows overall leaderboard.",
+    )
+    leaderboard_parser.add_argument(
+        "--metric",
+        "-m",
+        type=str,
+        choices=["pass_1", "pass_2", "pass_3", "pass_4", "cost"],
+        default="pass_1",
+        help="Metric to rank by. Default is 'pass_1'.",
+    )
+    leaderboard_parser.add_argument(
+        "--limit",
+        "-n",
+        type=int,
+        default=None,
+        help="Limit the number of entries to show.",
+    )
+    leaderboard_parser.set_defaults(func=lambda args: run_leaderboard(args))
+
+    # Submit command with subcommands
+    submit_parser = subparsers.add_parser(
+        "submit", help="Submission management for the leaderboard"
+    )
+    submit_subparsers = submit_parser.add_subparsers(
+        dest="submit_command", help="Submit subcommands", required=True
+    )
+
+    # Submit prepare subcommand
+    submit_prepare_parser = submit_subparsers.add_parser(
+        "prepare", help="Prepare a submission for the leaderboard"
+    )
+    submit_prepare_parser.add_argument(
+        "input_paths",
+        nargs="+",
+        help="Paths to trajectory files, directories, or glob patterns",
+    )
+    submit_prepare_parser.add_argument(
+        "--output",
+        "-o",
+        required=True,
+        help="Output directory to save the submission and trajectories",
+    )
+    submit_prepare_parser.add_argument(
+        "--no-verify",
+        action="store_true",
+        help="Skip trajectory verification step",
+    )
+    submit_prepare_parser.set_defaults(func=lambda args: run_prepare_submission(args))
+
+    # Submit validate subcommand
+    submit_validate_parser = submit_subparsers.add_parser(
+        "validate", help="Validate an existing submission directory"
+    )
+    submit_validate_parser.add_argument(
+        "submission_dir",
+        help="Path to the submission directory to validate",
+    )
+    submit_validate_parser.set_defaults(func=lambda args: run_validate_submission(args))
+
+    # Submit verify-trajs subcommand
+    submit_verify_parser = submit_subparsers.add_parser(
+        "verify-trajs", help="Verify trajectory files"
+    )
+    submit_verify_parser.add_argument(
+        "paths",
+        nargs="+",
+        help="Paths to trajectory files, directories, or glob patterns",
+    )
+    submit_verify_parser.set_defaults(func=lambda args: run_verify_trajectories(args))
+
+    # Convert results format command
+    convert_parser = subparsers.add_parser(
+        "convert-results",
+        help="Convert simulation results between storage formats",
+    )
+    convert_parser.add_argument(
+        "path",
+        help="Path to results.json or results directory to convert",
+    )
+    convert_parser.add_argument(
+        "--to",
+        dest="target_format",
+        choices=["json", "dir"],
+        default=None,
+        help="Target format: 'json' (monolithic) or 'dir' (directory with individual sim files). "
+        "If omitted, converts to the opposite of the current format.",
+    )
+    convert_parser.add_argument(
+        "--no-backup",
+        action="store_true",
+        help="Skip creating a .bak backup of the original file",
+    )
+    convert_parser.set_defaults(func=lambda args: run_convert_results(args))
+
+    args = parser.parse_args()
+    if not hasattr(args, "func"):
+        run_intro()
+        return
+
+    args.func(args)
+
+
+def run_view_simulations(args):
+    from tau3.scripts.view_simulations import main as view_main
+
+    if args.full_tool_results or args.max_tool_result_chars <= 0:
+        max_tool_result_length = None
+    else:
+        max_tool_result_length = args.max_tool_result_chars
+
+    view_main(
+        sim_file=args.file,
+        only_show_failed=args.only_show_failed,
+        only_show_all_failed=args.only_show_all_failed,
+        sim_dir=args.dir,
+        max_tool_result_length=max_tool_result_length,
+    )
+
+
+def run_show_domain(args):
+    from tau3.scripts.show_domain_doc import main as domain_main
+
+    domain_main(args.domain)
+
+
+def run_start_servers():
+    from tau3.scripts.start_servers import main as start_main
+
+    start_main()
+
+
+def run_check_data():
+    from tau3.scripts.check_data import main as check_data_main
+
+    check_data_main()
+
+
+def run_verify_trajectories(args):
+    import sys
+
+    from loguru import logger
+
+    from tau3.scripts.leaderboard.verify_trajectories import (
+        VerificationMode,
+        verify_trajectories,
+    )
+
+    logger.configure(handlers=[{"sink": sys.stderr, "level": "ERROR"}])
+
+    verify_trajectories(args.paths, VerificationMode.PUBLIC)
+
+
+def run_evaluate_trajectories(args):
+    import sys
+
+    from loguru import logger
+
+    from tau3.scripts.evaluate_trajectories import evaluate_trajectories
+
+    logger.configure(handlers=[{"sink": sys.stderr, "level": "ERROR"}])
+
+    evaluate_trajectories(
+        args.paths, args.output_dir, fresh_tasks=getattr(args, "fresh_tasks", False)
+    )
+
+
+def run_review(args):
+    """Run LLM-based conversation review."""
+    import sys
+    from pathlib import Path
+
+    from loguru import logger
+    from rich.console import Console
+
+    from tau3.scripts.review_conversation import ReviewMode, find_results_files, review
+
+    logger.configure(handlers=[{"sink": sys.stderr, "level": "WARNING"}])
+
+    # Find all results files
+    input_path = Path(args.path)
+    results_files = find_results_files(input_path)
+
+    if not results_files:
+        console = Console()
+        console.print(f"[red]No results.json files found in: {args.path}[/red]")
+        sys.exit(1)
+
+    # Run review for each results file
+    mode = ReviewMode.FULL if args.mode == "full" else ReviewMode.USER
+    console = Console()
+
+    if len(results_files) > 1:
+        console.print(
+            f"\n📁 Found {len(results_files)} results files to review:",
+            style="bold blue",
+        )
+        for i, rf in enumerate(results_files, 1):
+            console.print(f"  {i}. {rf.parent.name}/results.json")
+        console.print()
+
+    for i, results_file in enumerate(results_files):
+        if len(results_files) > 1:
+            console.print(
+                f"\n{'=' * 60}\n[bold cyan]Processing ({i + 1}/{len(results_files)}): {results_file.parent.name}[/bold cyan]\n{'=' * 60}"
+            )
+
+        review(
+            results_path=str(results_file),
+            mode=mode,
+            output_path=args.output if len(results_files) == 1 else None,
+            show_details=args.show_details,
+            max_concurrency=args.max_concurrency,
+            limit=args.limit,
+            task_ids=args.task_ids,
+            log_llm=args.log_llm,
+            review_model=args.review_model,
+        )
+
+
+def run_prepare_submission(args):
+    """Run the prepare submission command."""
+    from tau3.scripts.leaderboard.prepare_submission import prepare_submission
+
+    prepare_submission(
+        input_paths=args.input_paths,
+        output_dir=args.output,
+        run_verification=not args.no_verify,
+    )
+
+
+def run_validate_submission(args):
+    """Run the validate submission command."""
+    from tau3.scripts.leaderboard.prepare_submission import validate_submission
+
+    validate_submission(submission_dir=args.submission_dir)
+
+
+def run_manual_mode():
+    from tau3.scripts.manual_mode import main as manual_main
+
+    manual_main()
+
+
+def run_leaderboard(args):
+    """Show the tau-bench leaderboard."""
+    from tau3.scripts.leaderboard.leaderboard import show_leaderboard
+
+    show_leaderboard(
+        domain=args.domain,
+        metric=args.metric,
+        limit=args.limit,
+    )
+
+
+def run_convert_results(args):
+    """Convert simulation results between storage formats."""
+    import shutil
+    from pathlib import Path
+
+    from tau3.data_model.simulation import Results
+
+    path = Path(args.path)
+    current_fmt = Results._detect_format(path)
+    target_fmt = args.target_format
+
+    if target_fmt is None:
+        target_fmt = "json" if current_fmt == "dir" else "dir"
+
+    if current_fmt == target_fmt:
+        print(f"Results at {path} are already in '{target_fmt}' format.")
+        return
+
+    print(f"Converting {path}: '{current_fmt}' -> '{target_fmt}'")
+    results = Results.load(path)
+
+    meta_path = path if path.suffix == ".json" else path / "results.json"
+
+    if not args.no_backup:
+        if current_fmt == "json":
+            backup = meta_path.with_suffix(".json.bak")
+            shutil.copy2(meta_path, backup)
+            print(f"  Backup: {backup}")
+        else:
+            sims_dir = meta_path.parent / "simulations"
+            backup_dir = meta_path.parent / "simulations.bak"
+            if sims_dir.exists():
+                if backup_dir.exists():
+                    shutil.rmtree(backup_dir)
+                shutil.copytree(sims_dir, backup_dir)
+            backup = meta_path.with_suffix(".json.bak")
+            shutil.copy2(meta_path, backup)
+            print(f"  Backup: {backup}")
+            if backup_dir.exists():
+                print(f"  Backup: {backup_dir}")
+
+    if target_fmt == "dir":
+        results.save(meta_path, format="dir")
+    else:
+        sims_dir = meta_path.parent / "simulations"
+        results.save(meta_path, format="json")
+        if sims_dir.exists():
+            shutil.rmtree(sims_dir)
+
+    n = len(results.simulations)
+    print(f"  Done. {n} simulation(s) converted to '{target_fmt}' format.")
+
+
+if __name__ == "__main__":
+    main()

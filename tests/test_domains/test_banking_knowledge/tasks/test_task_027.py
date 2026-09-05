@@ -16,8 +16,8 @@ import json
 
 import pytest
 
-from tau2.data_model.message import ToolCall
-from tau2.environment.environment import Environment
+from tau3.data_model.message import ToolCall
+from tau3.environment.environment import Environment
 
 from .conftest import create_amara_db, create_environment
 

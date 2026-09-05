@@ -27,8 +27,8 @@ from typing import Optional
 
 from loguru import logger
 
-from tau2.agent.base_agent import HalfDuplexAgent, ValidAgentInputMessage
-from tau2.data_model.message import (
+from tau3.agent.base_agent import HalfDuplexAgent, ValidAgentInputMessage
+from tau3.data_model.message import (
     APICompatibleMessage,
     AssistantMessage,
     Message,
@@ -36,8 +36,8 @@ from tau2.data_model.message import (
     SystemMessage,
     UserMessage,
 )
-from tau2.environment.toolkit import Tool
-from tau2.utils.llm_utils import generate
+from tau3.environment.toolkit import Tool
+from tau3.utils.llm_utils import generate
 
 # =============================================================================
 # Prompts
@@ -206,9 +206,9 @@ def create_react_agent(tools, domain_policy, **kwargs):
 # =============================================================================
 
 if __name__ == "__main__":
-    from tau2.data_model.simulation import TextRunConfig
-    from tau2.registry import registry
-    from tau2.runner import get_tasks, run_single_task
+    from tau3.data_model.simulation import TextRunConfig
+    from tau3.registry import registry
+    from tau3.runner import get_tasks, run_single_task
 
     # Register the ReAct agent
     registry.register_agent_factory(create_react_agent, "react_agent")

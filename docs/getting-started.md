@@ -22,7 +22,7 @@ cd tau2-bench
 uv sync                        # core only (text-mode: mock)
 ```
 
-This creates a virtual environment, installs core dependencies from the lockfile, and enables the `tau2` command. The Python version is pinned via `.python-version` (3.12) — uv will download it automatically if needed.
+This creates a virtual environment, installs core dependencies from the lockfile, and enables the `tau3` command. The Python version is pinned via `.python-version` (3.12) — uv will download it automatically if needed.
 
 #### Optional extras
 
@@ -36,15 +36,15 @@ uv sync --extra experiments    # + plotting libs for src/experiments/
 uv sync --all-extras           # everything
 ```
 
-> **Note:** If you install without `-e` mode (e.g., `uv pip install .`), you'll need to set the `TAU2_DATA_DIR` environment variable to point to your data directory:
+> **Note:** If you install without `-e` mode (e.g., `uv pip install .`), you'll need to set the `TAU3_DATA_DIR` environment variable to point to your data directory:
 > ```bash
-> export TAU2_DATA_DIR=/path/to/your/tau2-bench/data
+> export TAU3_DATA_DIR=/path/to/your/tau2-bench/data
 > ```
 
 ### 3. Verify your installation
 
 ```bash
-uv run tau2 check-data
+uv run tau3 check-data
 ```
 
 This checks that your data directory is correctly configured and all required files are present.
@@ -64,7 +64,7 @@ cp .env.example .env
 ### Standard text-based evaluation (half-duplex)
 
 ```bash
-tau2 run --domain banking_knowledge --agent-llm gpt-4.1 --user-llm gpt-4.1 \
+tau3 run --domain banking_knowledge --agent-llm gpt-4.1 --user-llm gpt-4.1 \
   --num-trials 1 --num-tasks 5
 ```
 
@@ -73,11 +73,11 @@ Results are saved in `data/simulations/`.
 ### Knowledge retrieval evaluation
 
 ```bash
-tau2 run --domain banking_knowledge --retrieval-config bm25 \
+tau3 run --domain banking_knowledge --retrieval-config bm25 \
   --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-tasks 5
 ```
 
-See the [Knowledge Retrieval Documentation](../src/tau2/knowledge/README.md) for retrieval configuration options.
+See the [Knowledge Retrieval Documentation](../src/tau3/knowledge/README.md) for retrieval configuration options.
 
 
 > **tip**: for full agent evaluation that matches the original τ-bench methodology, remove `--num-tasks` to evaluate on the complete task set (the `base` split is used by default).
@@ -118,14 +118,14 @@ data/simulations/<run_name>/
 
 ### Format conversion
 
-You can convert between formats using `tau2 convert-results`:
+You can convert between formats using `tau3 convert-results`:
 
 ```bash
 # Convert a monolithic JSON to directory format
-tau2 convert-results data/simulations/my_run --to dir
+tau3 convert-results data/simulations/my_run --to dir
 
 # Convert a directory format back to monolithic JSON
-tau2 convert-results data/simulations/my_run --to json
+tau3 convert-results data/simulations/my_run --to json
 ```
 
 Both formats are fully supported by `Results.load()`, which auto-detects the format on disk.
@@ -133,14 +133,14 @@ Both formats are fully supported by `Results.load()`, which auto-detects the for
 ## Viewing Results
 
 ```bash
-tau2 view
+tau3 view
 ```
 
 This allows you to browse simulation files, view agent performance metrics, inspect individual simulations, and view task details.
 
 ## Configuration
 
-The framework is configured via [`src/tau2/config.py`](../src/tau2/config.py).
+The framework is configured via [`src/tau3/config.py`](../src/tau3/config.py).
 
 ### LLM Call Caching
 
@@ -161,10 +161,10 @@ make clean
 
 ## Next Steps
 
-- [CLI Reference](cli-reference.md) — all `tau2` commands and options
-- [Agent Developer Guide](../src/tau2/agent/README.md) — build and evaluate your own agent
-- [Domain Documentation](../src/tau2/domains/README.md) — understand the available domains
-- [Orchestrator](../src/tau2/orchestrator/README.md) — half-duplex (turn-based) orchestration
+- [CLI Reference](cli-reference.md) — all `tau3` commands and options
+- [Agent Developer Guide](../src/tau3/agent/README.md) — build and evaluate your own agent
+- [Domain Documentation](../src/tau3/domains/README.md) — understand the available domains
+- [Orchestrator](../src/tau3/orchestrator/README.md) — half-duplex (turn-based) orchestration
 - [Task Schema & Evaluation](evaluation.md) — how a task is scored, what `actions`/`communicate_info`/`reward_basis` actually do
-- [Knowledge Retrieval](../src/tau2/knowledge/README.md) — retrieval pipeline setup and configuration for banking_knowledge domain
-- [Gym/RL Interface](../src/tau2/gym/README.md) — Gymnasium-compatible environment for RL training
+- [Knowledge Retrieval](../src/tau3/knowledge/README.md) — retrieval pipeline setup and configuration for banking_knowledge domain
+- [Gym/RL Interface](../src/tau3/gym/README.md) — Gymnasium-compatible environment for RL training

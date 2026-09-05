@@ -1,17 +1,17 @@
 # CLI Reference
 
-The `tau2` command provides a unified interface for all τ-bench functionality. Use `tau2 <command> --help` to see full details for any command.
+The `tau3` command provides a unified interface for all τ-bench functionality. Use `tau3 <command> --help` to see full details for any command.
 
-Run `tau2 intro` (or just `tau2`) to see an overview of available domains, commands, and a quick-start guide directly in the terminal.
+Run `tau3 intro` (or just `tau3`) to see an overview of available domains, commands, and a quick-start guide directly in the terminal.
 
-## `tau2 run` — Run Evaluations
+## `tau3 run` — Run Evaluations
 
 Run agent evaluations across different communication modes.
 
 ### Basic Usage
 
 ```bash
-tau2 run \
+tau3 run \
   --domain <domain> \
   --agent-llm <llm_name> \
   --user-llm <llm_name> \
@@ -59,26 +59,26 @@ tau2 run \
 
 ```bash
 # Standard text evaluation
-tau2 run --domain banking_knowledge --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 1 --num-tasks 5
+tau3 run --domain banking_knowledge --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 1 --num-tasks 5
 
 # Knowledge retrieval with BM25
-tau2 run --domain banking_knowledge --retrieval-config bm25 \
+tau3 run --domain banking_knowledge --retrieval-config bm25 \
   --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-tasks 5
 
 # Knowledge retrieval with embeddings and reranker
-tau2 run --domain banking_knowledge --retrieval-config openai_embeddings_reranker \
+tau3 run --domain banking_knowledge --retrieval-config openai_embeddings_reranker \
   --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-tasks 5
 ```
 
 
 ---
 
-## `tau2 play` — Interactive Play Mode
+## `tau3 play` — Interactive Play Mode
 
 Experience τ-bench interactively from either perspective.
 
 ```bash
-tau2 play
+tau3 play
 ```
 
 Play mode allows you to:
@@ -88,16 +88,16 @@ Play mode allows you to:
 - **Test strategies** before implementing them in code
 - **Choose task splits** to practice on training data or test on held-out tasks
 
-See the [Gym Documentation](../src/tau2/gym/README.md) for using the gymnasium interface programmatically.
+See the [Gym Documentation](../src/tau3/gym/README.md) for using the gymnasium interface programmatically.
 
 ---
 
-## `tau2 view` — View Results
+## `tau3 view` — View Results
 
 Browse and analyze simulation results.
 
 ```bash
-tau2 view
+tau3 view
 ```
 
 | Option | Description |
@@ -109,44 +109,44 @@ tau2 view
 
 ---
 
-## `tau2 domain` — View Domain Documentation
+## `tau3 domain` — View Domain Documentation
 
 View domain policy and API documentation.
 
 ```bash
-tau2 domain <domain>
+tau3 domain <domain>
 ```
 
 Then visit http://127.0.0.1:8004/redoc to see the domain policy and available tools.
 
 ---
 
-## `tau2 check-data` — Check Data Configuration
+## `tau3 check-data` — Check Data Configuration
 
 Verify that your data directory is properly configured.
 
 ```bash
-tau2 check-data
+tau3 check-data
 ```
 
 ---
 
-## `tau2 start` — Start All Servers
+## `tau3 start` — Start All Servers
 
 Start all domain servers.
 
 ```bash
-tau2 start
+tau3 start
 ```
 
 ---
 
-## `tau2 evaluate-trajs` — Evaluate Trajectories
+## `tau3 evaluate-trajs` — Evaluate Trajectories
 
 Re-evaluate trajectory files and optionally update rewards.
 
 ```bash
-tau2 evaluate-trajs <paths...>
+tau3 evaluate-trajs <paths...>
 ```
 
 | Option | Description |
@@ -156,12 +156,12 @@ tau2 evaluate-trajs <paths...>
 
 ---
 
-## `tau2 review` — LLM Conversation Review
+## `tau3 review` — LLM Conversation Review
 
 Run LLM-based review on simulation results to detect agent and/or user errors.
 
 ```bash
-tau2 review <path>
+tau3 review <path>
 ```
 
 | Option | Description |
@@ -179,12 +179,12 @@ tau2 review <path>
 
 ---
 
-## `tau2 convert-results` — Convert Results Format
+## `tau3 convert-results` — Convert Results Format
 
 Convert simulation results between monolithic JSON and directory-based formats.
 
 ```bash
-tau2 convert-results <path> [--to {json,dir}] [--no-backup]
+tau3 convert-results <path> [--to {json,dir}] [--no-backup]
 ```
 
 | Option | Description |
@@ -197,12 +197,12 @@ Runs default to monolithic JSON. Use this command to convert to or from the dire
 
 ---
 
-## `tau2 leaderboard` — View Leaderboard
+## `tau3 leaderboard` — View Leaderboard
 
 Show the τ-bench leaderboard in the terminal.
 
 ```bash
-tau2 leaderboard
+tau3 leaderboard
 ```
 
 | Option | Description |
@@ -213,23 +213,23 @@ tau2 leaderboard
 
 ---
 
-## `tau2 submit` — Leaderboard Submission
+## `tau3 submit` — Leaderboard Submission
 
 See the full [Leaderboard Submission Guide](leaderboard-submission.md).
 
 ```bash
 # Prepare a submission
-tau2 submit prepare <paths...> --output ./my_submission
+tau3 submit prepare <paths...> --output ./my_submission
 
 
 # Skip trajectory verification during preparation
-tau2 submit prepare <paths...> --output ./my_submission --no-verify
+tau3 submit prepare <paths...> --output ./my_submission --no-verify
 
 # Validate a submission
-tau2 submit validate <submission_dir> [--mode public|private]
+tau3 submit validate <submission_dir> [--mode public|private]
 
 # Verify trajectory files
-tau2 submit verify-trajs <paths...> [--mode public|private]
+tau3 submit verify-trajs <paths...> [--mode public|private]
 ```
 
 ---
@@ -284,7 +284,7 @@ make test-all          # All tests (requires: uv sync --all-extras)
   rejects solo mode, so this currently only applies to `mock`.
 
 ```bash
-tau2 run \
+tau3 run \
   --domain banking_knowledge \
   --agent llm_agent_gt \
   --agent-llm gpt-4.1 \

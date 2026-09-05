@@ -1,6 +1,6 @@
 # Agent Examples
 
-Runnable examples showing how to create and evaluate custom tau2 agents.
+Runnable examples showing how to create and evaluate custom tau3 agents.
 
 ## Examples
 
@@ -61,4 +61,4 @@ class MyAgent(HalfDuplexAgent[MyState]):
 
 The agent receives `tools: list[Tool]` and `domain_policy: str` in `__init__`.
 
-See `src/tau2/agent/README.md` for the full developer guide.
+See `src/tau3/agent/README.md` for the full developer guide.

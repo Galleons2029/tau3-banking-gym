@@ -1,6 +1,6 @@
 """Tests for the in-memory work queue (lease/complete/fail/heartbeat semantics)."""
 
-from tau2.runner.work import (
+from tau3.runner.work import (
     FailOutcome,
     WorkQueue,
     WorkUnit,

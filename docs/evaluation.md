@@ -42,7 +42,7 @@ agent, this page is for you.
 ## The task schema, in plain English
 
 A task's `evaluation_criteria` (see
-[`src/tau2/data_model/tasks.py`](../src/tau2/data_model/tasks.py)) has five
+[`src/tau3/data_model/tasks.py`](../src/tau3/data_model/tasks.py)) has five
 fields:
 
 | Field | What it is | When it gates the reward |
@@ -95,7 +95,7 @@ those numbers and would also penalize correct-but-different solutions.
 
 ## A worked example: airline task `1`
 
-From [`data/tau2/domains/airline/tasks.json`](../data/tau2/domains/airline/tasks.json):
+From [`data/tau3/domains/airline/tasks.json`](../data/tau3/domains/airline/tasks.json):
 
 ```json
 {
@@ -156,9 +156,9 @@ still run for diagnostic purposes:
 - The CLI runner uses `EvaluationType.ALL_WITH_NL_ASSERTIONS` by default,
   so `action_checks` are populated on `RewardInfo` for every simulation,
   and `partial_action_reward` summarizes how many of the listed reference
-  actions were matched. These are surfaced by `tau2 view` (look for
+  actions were matched. These are surfaced by `tau3 view` (look for
   `Partial Action Reward: m/n`) and by the metrics functions in
-  `src/tau2/metrics/agent_metrics.py`. Note that this is a similarity
+  `src/tau3/metrics/agent_metrics.py`. Note that this is a similarity
   signal against *one* reference trajectory, not a correctness verdict —
   an agent can score `0/n` on `partial_action_reward` and still be fully
   correct if it solved the task via a different sequence of tool calls.
@@ -168,7 +168,7 @@ still run for diagnostic purposes:
   COMMUNICATE (and optionally NL) into a single number regardless of
   `reward_basis`. Same caveat: this measures similarity to one reference
   path, not whether the agent's behavior was correct. See
-  [`src/tau2/evaluator/evaluator.py`](../src/tau2/evaluator/evaluator.py).
+  [`src/tau3/evaluator/evaluator.py`](../src/tau3/evaluator/evaluator.py).
 - The `partial_action_reward` property on `RewardInfo` further breaks
   down the action match rate by `ToolType.READ` vs `ToolType.WRITE`,
   which is useful for spotting "DB-passes-but-no-write-was-attempted"
@@ -195,10 +195,10 @@ is only one).
 
 ## Pointers
 
-- Schema definitions: [`src/tau2/data_model/tasks.py`](../src/tau2/data_model/tasks.py)
-- Evaluator source: [`src/tau2/evaluator/`](../src/tau2/evaluator/)
-- Evaluator architecture overview: [`src/tau2/evaluator/AGENTS.md`](../src/tau2/evaluator/AGENTS.md)
+- Schema definitions: [`src/tau3/data_model/tasks.py`](../src/tau3/data_model/tasks.py)
+- Evaluator source: [`src/tau3/evaluator/`](../src/tau3/evaluator/)
+- Evaluator architecture overview: [`src/tau3/evaluator/AGENTS.md`](../src/tau3/evaluator/AGENTS.md)
 - Reward shape (`RewardInfo`, `ActionCheck`, etc.):
-  [`src/tau2/data_model/simulation.py`](../src/tau2/data_model/simulation.py)
+  [`src/tau3/data_model/simulation.py`](../src/tau3/data_model/simulation.py)
 - Discussion of the `actions`-vs-`reward_basis` confusion:
   [issue #224][issue-224] and [RFC #129][issue-129].

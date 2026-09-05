@@ -6,12 +6,12 @@ Status: draft design (2026-08-04)
 > (full-duplex) and multilingual runners. Voice support has since been removed;
 > references below to tau-voice, `VoiceRunConfig`, audio artifacts and tick
 > pacing describe the design's original context, not the current codebase.
-> The queue/lease mechanics it specifies are still what `tau2/runner` implements.
+> The queue/lease mechanics it specifies are still what `tau3/runner` implements.
 
 **Scope**: standard tau (text), tau-voice, and tau-multi (the multilingual
 pool/preset drivers on `soham/tau-multilingual`). Hyper-tau is explicitly
 out of current scope — the seam covers it structurally (see Coverage), and
-it joins later once its own `tau2 run` integration lands. A separate
+it joins later once its own `tau3 run` integration lands. A separate
 follow-up item, after this ships and the tau-multi drivers are ported:
 **remove the tau-multi-specific orchestration** (`pool_driver.py`'s
 subprocess-per-cell launching, host-wide process-table budget, cell flock
@@ -20,9 +20,9 @@ producer-side code.
 
 ## Background: what exists today, and why it caps out
 
-A `tau2 run` process executes simulations on a `ThreadPoolExecutor` bounded by
-`--max-concurrency` (`src/tau2/runner/batch.py`). The bottleneck is not the
-providers — it is Python compute in the main process. `tau2 bench-concurrency`
+A `tau3 run` process executes simulations on a `ThreadPoolExecutor` bounded by
+`--max-concurrency` (`src/tau3/runner/batch.py`). The bottleneck is not the
+providers — it is Python compute in the main process. `tau3 bench-concurrency`
 (private repo, `soham/tau-multilingual`, 2026-07-28) measured this directly:
 
 - 1 process at concurrency 30: 272.7 sims/hr, ~100 ms asyncio tick overrun,
@@ -31,8 +31,8 @@ providers — it is Python compute in the main process. `tau2 bench-concurrency`
   60 simulations genuinely in flight. Zero provider errors at any level.
 
 So the ceiling is **per process**, and useful parallelism above ~10 means
-**more processes**. The private repo's `tau2 pool` verb builds on that: a
-driver loop launches one `tau2 run --auto-resume` subprocess per (language ×
+**more processes**. The private repo's `tau3 pool` verb builds on that: a
+driver loop launches one `tau3 run --auto-resume` subprocess per (language ×
 arm) cell, each at concurrency 10, bounded by a host-wide budget of 8 cells,
 with per-cell `flock` locks so two drivers never put two writers on one
 results directory.
@@ -67,7 +67,7 @@ existing deps only.
 plus a reference to the run's config. This is naturally in the target
 granularity band — text sims run seconds to a couple of minutes, voice sims
 minutes. Nothing in tau-bench, tau-voice, or hyper-tau needs a finer or
-coarser unit; hyper-tau runs are still per-simulation `tau2 run` executions
+coarser unit; hyper-tau runs are still per-simulation `tau3 run` executions
 over different task representations.
 
 Seeds are computed by the **producer**, never the worker, using the stable
@@ -117,7 +117,7 @@ infrastructure-error files convincing `--auto-resume` a cell was complete.
 
 ### Controller
 
-- **Producer**: expands one or more `RunConfig`s into work units. `tau2 run`
+- **Producer**: expands one or more `RunConfig`s into work units. `tau3 run`
   produces units for one run; a pool/preset/matrix driver produces units for
   many runs into the *same* queue. The queue is heterogeneous by design —
   interleaving across providers falls out of the lease policy instead of
@@ -149,7 +149,7 @@ infrastructure-error files convincing `--auto-resume` a cell was complete.
 
 ### Workers
 
-A worker is `tau2 worker --controller <addr> --slots 10`. Its loop:
+A worker is `tau3 worker --controller <addr> --slots 10`. Its loop:
 
 1. Ask the controller for a lease (blocking long-poll, one request per free slot).
 2. Build and run the simulation — the existing Layer 1/2 code
@@ -174,7 +174,7 @@ class TaskSource(Protocol):
 
 Two implementations:
 
-- **`LocalTaskSource`** — plain in-process object. `tau2 run` without
+- **`LocalTaskSource`** — plain in-process object. `tau3 run` without
   `--workers` keeps today's behavior exactly (the ThreadPool calls it
   directly); zero new moving parts for the common case.
 - **`HttpTaskSource`** — the controller serves the same four calls over HTTP
@@ -182,7 +182,7 @@ Two implementations:
   client is ~50 lines of `httpx`. In local multi-process mode the controller
   binds `127.0.0.1:<random port>` and spawns its own workers as subprocesses
   with the address in an env var. **Multi-machine later is only**: bind a
-  routable address, add a bearer token, and start `tau2 worker` on other
+  routable address, add a bearer token, and start `tau3 worker` on other
   hosts pointed at it. No new protocol, no new code paths.
 
 Result payloads are JSON (`SimulationRun` already serializes). Voice audio
@@ -195,15 +195,15 @@ so it needs no version bump.
 ## CLI surface
 
 ```
-tau2 run ... --workers 6                     # 6 processes × --max-concurrency = in flight
-tau2 run ... --provider-limit openai=40      # cap at lease time
-tau2 worker --controller http://host:8321 --slots 10   # remote/extra workers
+tau3 run ... --workers 6                     # 6 processes × --max-concurrency = in flight
+tau3 run ... --provider-limit openai=40      # cap at lease time
+tau3 worker --controller http://host:8321 --slots 10   # remote/extra workers
 ```
 
 - Per-worker slots reuse the existing `--max-concurrency` knob (default 10)
   rather than adding a second flag: `--workers 6 --max-concurrency 10` = 60
   in flight, and the flag keeps its exact current meaning when
-  `--workers 0`. The standalone `tau2 worker` verb takes `--slots` since it
+  `--workers 0`. The standalone `tau3 worker` verb takes `--slots` since it
   has no run config of its own.
 - `--workers 0` (default): today's in-process ThreadPool, unchanged.
 - `--workers N`: controller mode; the run's own process does no simulation
@@ -222,20 +222,20 @@ execute through `run_tasks` in `runner/batch.py`, which is exactly where the
 main (its runner diff touches only `build.py` and `simulation.py`), so the
 seam lands identically there.
 
-Tau-multi is covered at both layers: its cells are ordinary `tau2 run`
-invocations (so the seam applies), and its drivers (`run-preset`, `tau2
+Tau-multi is covered at both layers: its cells are ordinary `tau3 run`
+invocations (so the seam applies), and its drivers (`run-preset`, `tau3
 pool`) become producers in the driver-port step.
 
 Hyper-tau is **out of current scope** but structurally covered, with two
 paths for later:
 
-1. **`tau2 run --domain hyper_*`** — hyper-tau's own README declares wiring
+1. **`tau3 run --domain hyper_*`** — hyper-tau's own README declares wiring
    hyper domains through `runner.batch.run_tasks` as its follow-up (the
-   registered factory is currently a placeholder; `tau2 hyper-tau` is the
+   registered factory is currently a placeholder; `tau3 hyper-tau` is the
    working CLI). Once that wiring lands, a hyper episode flows through the
    same seam with zero parallel-runner work: one outer episode = one
    WorkUnit.
-2. **The current `tau2 hyper-tau` orchestration** (outer_orchestrator,
+2. **The current `tau3 hyper-tau` orchestration** (outer_orchestrator,
    eval_transfer) runs its own ThreadPools and would be a driver port, same
    shape as `run_multiple.py` and the pool driver.
 
@@ -284,7 +284,7 @@ Supported, with one rule: **one controller per results directory**. The
 preferred shape for "many runs at once" (a pool, a preset matrix, unrelated
 experiments) is many runs registered in **one** controller — that is the
 whole point of the heterogeneous queue, and it is what makes provider caps
-and the host budget actually global. Two independent `tau2 run` invocations
+and the host budget actually global. Two independent `tau3 run` invocations
 with different `save_to` targets also work (each is its own controller), but
 their caps are per-controller: two controllers each capped at
 `openai=40` are 80 against the provider. So: fine to do, but split the
@@ -333,7 +333,7 @@ the pool driver uses today.
   entry (controller is the single writer); an `infrastructure_error` result
   is requeued, then written once attempts are exhausted; `/fail` requeues
   then produces a placeholder infra sim when dead; duplicate/stale completes
-  are ignored. Worker-loop test drives `tau2.runner.worker` against the same
+  are ignored. Worker-loop test drives `tau3.runner.worker` against the same
   ASGI app with `run_unit` monkeypatched to return fabricated sims: all
   units complete, worker exits on done, results land in the checkpoint.
 - `tests/test_runner/test_local_seam.py` — `run_tasks` with `workers=0` and
@@ -343,7 +343,7 @@ the pool driver uses today.
 
 ### Manual
 
-1. Baseline: `tau2 run --domain mock --agent llm_agent --user user_simulator
+1. Baseline: `tau3 run --domain mock --agent llm_agent --user user_simulator
    --num-tasks 2 --num-trials 2 --max-concurrency 2 --save-to <dir A>`
    (workers=0, requires LLM keys).
 2. Same command with `--workers 2 --save-to <dir B>`: completes, per-task
@@ -360,14 +360,14 @@ the pool driver uses today.
 
 1. **Extract the seam** — introduce `TaskSource` + `LocalTaskSource`, refactor
    `run_tasks` to consume it. Pure refactor, no behavior change (public repo).
-2. **Controller + worker** — `HttpTaskSource`, `tau2 worker`, `--workers N`
+2. **Controller + worker** — `HttpTaskSource`, `tau3 worker`, `--workers N`
    spawn path, lease TTL/retry, per-provider limits. Validate against
    `bench-concurrency` numbers: 6×10 should reproduce ~626 sims/hr.
 3. **Port the drivers** — `run_multiple.py` (public, tau-voice) and
    pool/preset (private, tau-multilingual) become producers over the shared
    controller. `run_multiple.py` is the simplest port and the proof of the
    "multiple top-level runs" story: today it runs its grid combos
-   *sequentially*, one `tau2 run --auto-resume` subprocess at a time; as a
+   *sequentially*, one `tau3 run --auto-resume` subprocess at a time; as a
    producer it registers all combos in one controller and the grid runs
    concurrently under the global caps.
 4. **Remove the tau-multi-specific implementation** (separate item, after 3
@@ -376,6 +376,6 @@ the pool driver uses today.
    flock/pid machinery; keep `pools.py` (the spec is the record of what ran)
    and the census/dedup/coverage logic as producer-side code.
 5. **(Later, out of scope) hyper-tau** — rides the seam once its
-   `tau2 run --domain hyper_*` wiring lands; the `tau2 hyper-tau`
+   `tau3 run --domain hyper_*` wiring lands; the `tau3 hyper-tau`
    orchestration port is its own item.
 6. **(Later) multi-machine** — auth token, routable bind, artifact upload.

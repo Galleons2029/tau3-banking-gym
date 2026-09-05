@@ -806,7 +806,7 @@
       "type": "object"
     }
   },
-  "description": "Schema for submitting model results to the tau2-bench leaderboard. Auto-generated from the Pydantic model in src/tau2/scripts/leaderboard/submission.py \u2014 do not edit by hand.",
+  "description": "Schema for submitting model results to the tau2-bench leaderboard. Auto-generated from the Pydantic model in src/tau3/scripts/leaderboard/submission.py \u2014 do not edit by hand.",
   "examples": [
     {
       "contact_info": {

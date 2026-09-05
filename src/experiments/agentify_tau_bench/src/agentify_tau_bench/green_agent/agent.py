@@ -21,10 +21,10 @@ from agentify_tau_bench.utils import a2a_send_message, parse_tags
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from tau2.data_model.simulation import RewardInfo, SimulationRun
-from tau2.environment.tool import Tool
-from tau2.gym import TAU_BENCH_ENV_ID, register_gym_agent
-from tau2.run import get_tasks
+from tau3.data_model.simulation import RewardInfo, SimulationRun
+from tau3.environment.tool import Tool
+from tau3.gym import TAU_BENCH_ENV_ID, register_gym_agent
+from tau3.run import get_tasks
 
 dotenv.load_dotenv()
 
@@ -330,7 +330,7 @@ class TauGreenAgentExecutor(AgentExecutor):
         raise NotImplementedError
 
 
-def start_green_agent(agent_name="tau2_green_agent", host="localhost", port=9001):
+def start_green_agent(agent_name="tau3_green_agent", host="localhost", port=9001):
     """
     Start the green agent.
 

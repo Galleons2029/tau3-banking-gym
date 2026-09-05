@@ -19,8 +19,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tau2.knowledge import sandbox_manager
-from tau2.knowledge.sandbox_manager import (
+from tau3.knowledge import sandbox_manager
+from tau3.knowledge.sandbox_manager import (
     SandboxManager,
     SandboxRuntimeError,
     _check_sandbox_dependencies,

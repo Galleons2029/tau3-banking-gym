@@ -13,9 +13,9 @@ import json
 
 import pytest
 
-from tau2.data_model.message import ToolCall
-from tau2.domains.banking_knowledge.data_model import DatabaseTable, TransactionalDB
-from tau2.domains.banking_knowledge.db_query import (
+from tau3.data_model.message import ToolCall
+from tau3.domains.banking_knowledge.data_model import DatabaseTable, TransactionalDB
+from tau3.domains.banking_knowledge.db_query import (
     add_to_db,
     list_databases,
     query_database_tool,
@@ -23,12 +23,12 @@ from tau2.domains.banking_knowledge.db_query import (
     remove_from_db,
     update_record_in_db,
 )
-from tau2.domains.banking_knowledge.tools import (
+from tau3.domains.banking_knowledge.tools import (
     KnowledgeTools,
     KnowledgeUserTools,
     _validate_pin,
 )
-from tau2.environment.environment import Environment
+from tau3.environment.environment import Environment
 
 # =============================================================================
 # Fixtures

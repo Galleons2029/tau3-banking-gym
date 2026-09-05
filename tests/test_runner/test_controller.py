@@ -13,13 +13,13 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from tau2.data_model.simulation import SimulationRun, TerminationReason, TextRunConfig
-from tau2.run import get_tasks
-from tau2.runner import worker as worker_mod
-from tau2.runner.batch import prepare_batch
-from tau2.runner.controller import Controller, ControllerRun
-from tau2.runner.work import WorkUnit
-from tau2.runner.worker import ControllerClient, worker_loop
+from tau3.data_model.simulation import SimulationRun, TerminationReason, TextRunConfig
+from tau3.run import get_tasks
+from tau3.runner import worker as worker_mod
+from tau3.runner.batch import prepare_batch
+from tau3.runner.controller import Controller, ControllerRun
+from tau3.runner.work import WorkUnit
+from tau3.runner.worker import ControllerClient, worker_loop
 
 
 def _make_config(**overrides) -> TextRunConfig:

@@ -1,7 +1,7 @@
 import pytest
 
-from tau2.data_model.message import AssistantMessage, UserMessage
-from tau2.user.user_simulator import DummyUser, UserSimulator
+from tau3.data_model.message import AssistantMessage, UserMessage
+from tau3.user.user_simulator import DummyUser, UserSimulator
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 # Running Simulations
 
-This guide covers the `tau2.runner` API for running simulations at different levels of control. Whether you want a one-liner CLI command or full programmatic control over every component, the runner framework has you covered.
+This guide covers the `tau3.runner` API for running simulations at different levels of control. Whether you want a one-liner CLI command or full programmatic control over every component, the runner framework has you covered.
 
 ## Architecture Overview
 
@@ -18,22 +18,22 @@ Each layer builds on the one below it, but you can enter at any level depending 
 
 ## Level 1: CLI (Simplest)
 
-The fastest way to run simulations is through the `tau2 run` command:
+The fastest way to run simulations is through the `tau3 run` command:
 
 ```bash
 # Run all banking_knowledge tasks with GPT-4.1
-tau2 run --domain banking_knowledge --agent llm_agent --agent-llm openai/gpt-4.1
+tau3 run --domain banking_knowledge --agent llm_agent --agent-llm openai/gpt-4.1
 
 # Run specific tasks with multiple trials
-tau2 run --domain banking_knowledge --agent llm_agent --agent-llm openai/gpt-4.1 \
+tau3 run --domain banking_knowledge --agent llm_agent --agent-llm openai/gpt-4.1 \
     --task-ids task_001 task_002 --num-trials 3
 
 # Run with concurrency and auto-resume
-tau2 run --domain banking_knowledge --agent llm_agent --agent-llm openai/gpt-4.1 \
+tau3 run --domain banking_knowledge --agent llm_agent --agent-llm openai/gpt-4.1 \
     --max-concurrency 4 --auto-resume
 ```
 
-See `tau2 run --help` or [CLI Reference](cli-reference.md) for all options.
+See `tau3 run --help` or [CLI Reference](cli-reference.md) for all options.
 
 ---
 
@@ -44,8 +44,8 @@ For programmatic use, create a `TextRunConfig` and call `run_domain()`:
 ### Text (half-duplex) simulations
 
 ```python
-from tau2 import TextRunConfig
-from tau2.runner import run_domain
+from tau3 import TextRunConfig
+from tau3.runner import run_domain
 
 config = TextRunConfig(
     domain="banking_knowledge",
@@ -59,7 +59,7 @@ config = TextRunConfig(
 
 results = run_domain(config)
 # compute_metrics() returns an AgentMetrics object with avg_reward, pass_hat_ks, etc.
-from tau2.metrics.agent_metrics import compute_metrics
+from tau3.metrics.agent_metrics import compute_metrics
 metrics = compute_metrics(results)
 print(f"Average reward: {metrics.avg_reward}")
 ```
@@ -67,8 +67,8 @@ print(f"Average reward: {metrics.avg_reward}")
 ### Knowledge retrieval simulations
 
 ```python
-from tau2 import TextRunConfig
-from tau2.runner import run_domain
+from tau3 import TextRunConfig
+from tau3.runner import run_domain
 
 config = TextRunConfig(
     domain="banking_knowledge",
@@ -90,8 +90,8 @@ This handles everything: task loading, filtering, concurrency, checkpointing, me
 
 ```python
 from pathlib import Path
-from tau2 import TextRunConfig
-from tau2.runner import get_tasks, run_tasks
+from tau3 import TextRunConfig
+from tau3.runner import get_tasks, run_tasks
 
 config = TextRunConfig(
     domain="banking_knowledge",
@@ -114,8 +114,8 @@ results = run_tasks(
 ### Running a single task
 
 ```python
-from tau2 import TextRunConfig
-from tau2.runner import run_single_task, get_tasks
+from tau3 import TextRunConfig
+from tau3.runner import run_single_task, get_tasks
 
 config = TextRunConfig(domain="banking_knowledge", agent="llm_agent", llm_agent="openai/gpt-4.1")
 tasks = get_tasks("banking_knowledge")
@@ -137,7 +137,7 @@ For maximum control, build instances yourself and use `run_simulation()`. This i
 ### Using build helpers with the registry
 
 ```python
-from tau2.runner import (
+from tau3.runner import (
     build_environment,
     build_agent,
     build_user,
@@ -145,14 +145,14 @@ from tau2.runner import (
     run_simulation,
     get_tasks,
 )
-from tau2.evaluator.evaluator import EvaluationType
+from tau3.evaluator.evaluator import EvaluationType
 
 # Load a task
 tasks = get_tasks("banking_knowledge")
 task = tasks[0]
 
 # Option A: Build orchestrator from config (uses registry)
-from tau2 import TextRunConfig
+from tau3 import TextRunConfig
 config = TextRunConfig(domain="banking_knowledge", agent="llm_agent", llm_agent="openai/gpt-4.1")
 orchestrator = build_orchestrator(config, task, seed=42)
 result = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
@@ -166,9 +166,9 @@ user = build_user("user_simulator", env, task, llm="openai/gpt-4.1-mini")
 ### Fully custom instances (no registry needed)
 
 ```python
-from tau2.runner import run_simulation
-from tau2.orchestrator.orchestrator import Orchestrator
-from tau2.user.user_simulator import UserSimulator
+from tau3.runner import run_simulation
+from tau3.orchestrator.orchestrator import Orchestrator
+from tau3.user.user_simulator import UserSimulator
 
 # Your custom environment and agent
 env = MyCustomEnvironment()

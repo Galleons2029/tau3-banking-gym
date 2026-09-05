@@ -98,23 +98,23 @@ def _make_grep_state(docs: List[Dict[str, Any]] | None = None) -> Dict[str, Any]
 
 
 class TestRegistry:
-    """Tests for tau2.knowledge.registry module."""
+    """Tests for tau3.knowledge.registry module."""
 
     def test_register_and_get_retriever(self):
-        from tau2.knowledge.registry import RETRIEVERS, get_retriever
+        from tau3.knowledge.registry import RETRIEVERS, get_retriever
 
         # BM25 is auto-registered on import
-        from tau2.knowledge.retrievers.bm25_retriever import BM25Retriever  # noqa: F401
+        from tau3.knowledge.retrievers.bm25_retriever import BM25Retriever  # noqa: F401
 
         assert "bm25" in RETRIEVERS
         ret = get_retriever("bm25", {"top_k": 5})
         assert ret.top_k == 5
 
     def test_register_and_get_document_preprocessor(self):
-        from tau2.knowledge.document_preprocessors.bm25_indexer import (
+        from tau3.knowledge.document_preprocessors.bm25_indexer import (
             BM25Indexer,  # noqa: F401
         )
-        from tau2.knowledge.registry import (
+        from tau3.knowledge.registry import (
             DOCUMENT_PREPROCESSORS,
             get_document_preprocessor,
         )
@@ -124,32 +124,32 @@ class TestRegistry:
         assert dp.state_key == "my_bm25"
 
     def test_get_retriever_unknown_raises(self):
-        from tau2.knowledge.registry import get_retriever
+        from tau3.knowledge.registry import get_retriever
 
         with pytest.raises(ValueError, match="Unknown retriever"):
             get_retriever("nonexistent_retriever", {})
 
     def test_get_document_preprocessor_unknown_raises(self):
-        from tau2.knowledge.registry import get_document_preprocessor
+        from tau3.knowledge.registry import get_document_preprocessor
 
         with pytest.raises(ValueError, match="Unknown document_preprocessor"):
             get_document_preprocessor("nonexistent_dp", {})
 
     def test_get_input_preprocessor_unknown_raises(self):
-        from tau2.knowledge.registry import get_input_preprocessor
+        from tau3.knowledge.registry import get_input_preprocessor
 
         with pytest.raises(ValueError, match="Unknown input_preprocessor"):
             get_input_preprocessor("nonexistent_ip", {})
 
     def test_get_postprocessor_unknown_raises(self):
-        from tau2.knowledge.registry import get_postprocessor
+        from tau3.knowledge.registry import get_postprocessor
 
         with pytest.raises(ValueError, match="Unknown postprocessor"):
             get_postprocessor("nonexistent_pp", {})
 
     def test_register_and_get_grep_retriever(self):
-        from tau2.knowledge.registry import RETRIEVERS, get_retriever
-        from tau2.knowledge.retrievers.grep_retriever import GrepRetriever  # noqa: F401
+        from tau3.knowledge.registry import RETRIEVERS, get_retriever
+        from tau3.knowledge.retrievers.grep_retriever import GrepRetriever  # noqa: F401
 
         assert "grep" in RETRIEVERS
         ret = get_retriever("grep", {"top_k": 3, "case_sensitive": True})
@@ -157,8 +157,8 @@ class TestRegistry:
         assert ret.case_sensitive is True
 
     def test_register_and_get_cosine_retriever(self):
-        from tau2.knowledge.registry import RETRIEVERS, get_retriever
-        from tau2.knowledge.retrievers.cosine_retriever import (
+        from tau3.knowledge.registry import RETRIEVERS, get_retriever
+        from tau3.knowledge.retrievers.cosine_retriever import (
             CosineRetriever,  # noqa: F401
         )
 
@@ -173,10 +173,10 @@ class TestRegistry:
 
 
 class TestConfigValidation:
-    """Tests for tau2.knowledge.config.validate_config."""
+    """Tests for tau3.knowledge.config.validate_config."""
 
     def test_valid_config_single_retriever(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         cfg = {
             "retriever": {"type": "bm25", "params": {}},
@@ -188,7 +188,7 @@ class TestConfigValidation:
         assert cfg["postprocessors"] == []
 
     def test_valid_config_multiple_retrievers(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         cfg = {
             "retrievers": [
@@ -199,13 +199,13 @@ class TestConfigValidation:
         validate_config(cfg)
 
     def test_missing_retriever_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(ValueError, match="must have 'retriever' or 'retrievers'"):
             validate_config({"document_preprocessors": []})
 
     def test_both_retriever_and_retrievers_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(ValueError, match="cannot have both"):
             validate_config(
@@ -216,25 +216,25 @@ class TestConfigValidation:
             )
 
     def test_retriever_missing_type_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(ValueError, match="retriever must have 'type'"):
             validate_config({"retriever": {"params": {}}})
 
     def test_retrievers_list_empty_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(ValueError, match="retrievers list cannot be empty"):
             validate_config({"retrievers": []})
 
     def test_retrievers_item_missing_type_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(ValueError, match="retrievers\\[0\\] must have 'type'"):
             validate_config({"retrievers": [{"params": {}}]})
 
     def test_document_preprocessors_not_list_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(ValueError, match="document_preprocessors must be a list"):
             validate_config(
@@ -245,7 +245,7 @@ class TestConfigValidation:
             )
 
     def test_input_preprocessors_not_list_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(ValueError, match="input_preprocessors must be a list"):
             validate_config(
@@ -256,7 +256,7 @@ class TestConfigValidation:
             )
 
     def test_postprocessors_not_list_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(ValueError, match="postprocessors must be a list"):
             validate_config(
@@ -267,7 +267,7 @@ class TestConfigValidation:
             )
 
     def test_preprocessor_missing_type_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(
             ValueError, match="document_preprocessor\\[0\\] must have 'type'"
@@ -280,7 +280,7 @@ class TestConfigValidation:
             )
 
     def test_input_preprocessor_missing_type_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(
             ValueError, match="input_preprocessor\\[0\\] must have 'type'"
@@ -293,7 +293,7 @@ class TestConfigValidation:
             )
 
     def test_postprocessor_missing_type_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(ValueError, match="postprocessor\\[0\\] must have 'type'"):
             validate_config(
@@ -304,7 +304,7 @@ class TestConfigValidation:
             )
 
     def test_tool_name_not_string_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(ValueError, match="tool_name must be a string"):
             validate_config(
@@ -315,7 +315,7 @@ class TestConfigValidation:
             )
 
     def test_description_not_string_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(ValueError, match="description must be a string"):
             validate_config(
@@ -326,7 +326,7 @@ class TestConfigValidation:
             )
 
     def test_parameters_not_dict_raises(self):
-        from tau2.knowledge.config import validate_config
+        from tau3.knowledge.config import validate_config
 
         with pytest.raises(ValueError, match="parameters must be a dict"):
             validate_config(
@@ -338,14 +338,14 @@ class TestConfigValidation:
 
     def test_get_default_config_bm25_shape(self):
         """get_default_config with full_kb returns a valid full-kb config."""
-        from tau2.knowledge.config import get_default_config
+        from tau3.knowledge.config import get_default_config
 
         cfg = get_default_config(embedder_type="full_kb")
         assert cfg["retriever"]["type"] == "full_kb"
         assert cfg["document_preprocessors"] == []
 
     def test_get_default_config_openai_shape(self):
-        from tau2.knowledge.config import get_default_config
+        from tau3.knowledge.config import get_default_config
 
         cfg = get_default_config(embedder_type="openai", top_k=3)
         assert cfg["retriever"]["type"] == "cosine"
@@ -363,7 +363,7 @@ class TestBM25Retriever:
     """Tests for BM25Retriever."""
 
     def _make_retriever(self, top_k: int = 10):
-        from tau2.knowledge.retrievers.bm25_retriever import BM25Retriever
+        from tau3.knowledge.retrievers.bm25_retriever import BM25Retriever
 
         return BM25Retriever(top_k=top_k)
 
@@ -442,7 +442,7 @@ class TestGrepRetriever:
     """Tests for GrepRetriever."""
 
     def _make_retriever(self, top_k: int = 10, case_sensitive: bool = False):
-        from tau2.knowledge.retrievers.grep_retriever import GrepRetriever
+        from tau3.knowledge.retrievers.grep_retriever import GrepRetriever
 
         return GrepRetriever(top_k=top_k, case_sensitive=case_sensitive)
 
@@ -556,7 +556,7 @@ class TestCosineRetriever:
     """Tests for CosineRetriever with synthetic embeddings."""
 
     def _make_retriever(self, top_k: int = 10):
-        from tau2.knowledge.retrievers.cosine_retriever import CosineRetriever
+        from tau3.knowledge.retrievers.cosine_retriever import CosineRetriever
 
         return CosineRetriever(top_k=top_k)
 
@@ -628,7 +628,7 @@ class TestCosineRetriever:
             assert len(results) == 2
 
     def test_cosine_similarity_batch_shape(self):
-        from tau2.knowledge.retrievers.cosine_retriever import CosineRetriever
+        from tau3.knowledge.retrievers.cosine_retriever import CosineRetriever
 
         ret = CosineRetriever()
         queries = np.random.default_rng(0).standard_normal((3, 8)).astype(np.float32)
@@ -646,7 +646,7 @@ class TestBM25Indexer:
     """Tests for BM25Indexer document preprocessor."""
 
     def _make_indexer(self, **kwargs):
-        from tau2.knowledge.document_preprocessors.bm25_indexer import BM25Indexer
+        from tau3.knowledge.document_preprocessors.bm25_indexer import BM25Indexer
 
         return BM25Indexer(**kwargs)
 
@@ -697,9 +697,9 @@ class TestRetrievalPipeline:
     def bm25_pipeline(self):
         """Create a BM25 pipeline ready to use."""
         # Ensure BM25 components are registered
-        import tau2.knowledge.document_preprocessors.bm25_indexer  # noqa: F401
-        import tau2.knowledge.retrievers.bm25_retriever  # noqa: F401
-        from tau2.knowledge.pipeline import RetrievalPipeline
+        import tau3.knowledge.document_preprocessors.bm25_indexer  # noqa: F401
+        import tau3.knowledge.retrievers.bm25_retriever  # noqa: F401
+        from tau3.knowledge.pipeline import RetrievalPipeline
 
         config = {
             "document_preprocessors": [
@@ -724,8 +724,8 @@ class TestRetrievalPipeline:
     @pytest.fixture
     def grep_pipeline(self):
         """Create a Grep pipeline ready to use."""
-        import tau2.knowledge.retrievers.grep_retriever  # noqa: F401
-        from tau2.knowledge.pipeline import RetrievalPipeline
+        import tau3.knowledge.retrievers.grep_retriever  # noqa: F401
+        from tau3.knowledge.pipeline import RetrievalPipeline
 
         config = {
             "document_preprocessors": [],
@@ -754,8 +754,8 @@ class TestRetrievalPipeline:
         assert len(bm25_pipeline.state["documents"]) == len(SAMPLE_DOCUMENTS)
 
     def test_index_documents_empty_raises(self):
-        import tau2.knowledge.retrievers.bm25_retriever  # noqa: F401
-        from tau2.knowledge.pipeline import RetrievalPipeline
+        import tau3.knowledge.retrievers.bm25_retriever  # noqa: F401
+        from tau3.knowledge.pipeline import RetrievalPipeline
 
         pipeline = RetrievalPipeline(
             {
@@ -778,8 +778,8 @@ class TestRetrievalPipeline:
     # -- Retrieve ----------------------------------------------------------
 
     def test_retrieve_without_indexing_raises(self):
-        import tau2.knowledge.retrievers.bm25_retriever  # noqa: F401
-        from tau2.knowledge.pipeline import RetrievalPipeline
+        import tau3.knowledge.retrievers.bm25_retriever  # noqa: F401
+        from tau3.knowledge.pipeline import RetrievalPipeline
 
         pipeline = RetrievalPipeline({"retriever": {"type": "bm25", "params": {}}})
         with pytest.raises(ValueError, match="No documents indexed"):
@@ -801,7 +801,7 @@ class TestRetrievalPipeline:
         assert len(results) <= 2
 
     def test_retrieve_with_timing(self, bm25_pipeline):
-        from tau2.knowledge.pipeline import RetrievalResult
+        from tau3.knowledge.pipeline import RetrievalResult
 
         result = bm25_pipeline.retrieve("fee", return_timing=True)
         assert isinstance(result, RetrievalResult)
@@ -821,8 +821,8 @@ class TestRetrievalPipeline:
     # -- Retrieve batch ----------------------------------------------------
 
     def test_retrieve_batch_without_indexing_raises(self):
-        import tau2.knowledge.retrievers.bm25_retriever  # noqa: F401
-        from tau2.knowledge.pipeline import RetrievalPipeline
+        import tau3.knowledge.retrievers.bm25_retriever  # noqa: F401
+        from tau3.knowledge.pipeline import RetrievalPipeline
 
         pipeline = RetrievalPipeline({"retriever": {"type": "bm25", "params": {}}})
         with pytest.raises(ValueError, match="No documents indexed"):
@@ -874,8 +874,8 @@ class TestRetrievalPipeline:
             assert Path(path).exists()
 
             # Load into new pipeline
-            import tau2.knowledge.retrievers.bm25_retriever  # noqa: F401
-            from tau2.knowledge.pipeline import RetrievalPipeline
+            import tau3.knowledge.retrievers.bm25_retriever  # noqa: F401
+            from tau3.knowledge.pipeline import RetrievalPipeline
 
             new_pipeline = RetrievalPipeline(
                 {
@@ -910,10 +910,10 @@ class TestRetrievalPipeline:
 
     def test_multi_retriever_pipeline(self):
         """Pipeline with both BM25 and Grep retrievers."""
-        import tau2.knowledge.document_preprocessors.bm25_indexer  # noqa: F401
-        import tau2.knowledge.retrievers.bm25_retriever  # noqa: F401
-        import tau2.knowledge.retrievers.grep_retriever  # noqa: F401
-        from tau2.knowledge.pipeline import RetrievalPipeline
+        import tau3.knowledge.document_preprocessors.bm25_indexer  # noqa: F401
+        import tau3.knowledge.retrievers.bm25_retriever  # noqa: F401
+        import tau3.knowledge.retrievers.grep_retriever  # noqa: F401
+        from tau3.knowledge.pipeline import RetrievalPipeline
 
         config = {
             "document_preprocessors": [
@@ -950,9 +950,9 @@ class TestRetrievalPipeline:
         assert "doc_1" in doc_ids
 
     def test_multi_retriever_get_name(self):
-        import tau2.knowledge.retrievers.bm25_retriever  # noqa: F401
-        import tau2.knowledge.retrievers.grep_retriever  # noqa: F401
-        from tau2.knowledge.pipeline import RetrievalPipeline
+        import tau3.knowledge.retrievers.bm25_retriever  # noqa: F401
+        import tau3.knowledge.retrievers.grep_retriever  # noqa: F401
+        from tau3.knowledge.pipeline import RetrievalPipeline
 
         config = {
             "retrievers": [
@@ -966,10 +966,10 @@ class TestRetrievalPipeline:
 
     def test_multi_retriever_takes_max_score(self):
         """When both retrievers find a doc, the max score is kept."""
-        import tau2.knowledge.document_preprocessors.bm25_indexer  # noqa: F401
-        import tau2.knowledge.retrievers.bm25_retriever  # noqa: F401
-        import tau2.knowledge.retrievers.grep_retriever  # noqa: F401
-        from tau2.knowledge.pipeline import RetrievalPipeline
+        import tau3.knowledge.document_preprocessors.bm25_indexer  # noqa: F401
+        import tau3.knowledge.retrievers.bm25_retriever  # noqa: F401
+        import tau3.knowledge.retrievers.grep_retriever  # noqa: F401
+        from tau3.knowledge.pipeline import RetrievalPipeline
 
         config = {
             "document_preprocessors": [
@@ -1004,7 +1004,7 @@ class TestRetrievalTiming:
     """Tests for the RetrievalTiming dataclass."""
 
     def test_total_ms(self):
-        from tau2.knowledge.pipeline import RetrievalTiming
+        from tau3.knowledge.pipeline import RetrievalTiming
 
         t = RetrievalTiming(
             input_preprocessing_ms=10.0,
@@ -1014,7 +1014,7 @@ class TestRetrievalTiming:
         assert t.total_ms == 80.0
 
     def test_to_dict(self):
-        from tau2.knowledge.pipeline import RetrievalTiming
+        from tau3.knowledge.pipeline import RetrievalTiming
 
         t = RetrievalTiming(
             input_preprocessing_ms=10.123,
@@ -1030,7 +1030,7 @@ class TestRetrievalTiming:
         assert "total_ms" in d
 
     def test_defaults(self):
-        from tau2.knowledge.pipeline import RetrievalTiming
+        from tau3.knowledge.pipeline import RetrievalTiming
 
         t = RetrievalTiming()
         assert t.total_ms == 0.0
@@ -1046,7 +1046,7 @@ class TestRetrievalVariantRegistry:
     """Tests for RETRIEVAL_VARIANTS, resolve_variant, and get_all_variant_names."""
 
     def test_get_all_variant_names(self):
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             RETRIEVAL_VARIANTS,
             get_all_variant_names,
         )
@@ -1067,26 +1067,26 @@ class TestRetrievalVariantRegistry:
         assert set(names) == set(RETRIEVAL_VARIANTS.keys())
 
     def test_resolve_variant_known(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("no_knowledge")
         assert variant.name == "no_knowledge"
 
     def test_resolve_variant_unknown_raises(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         with pytest.raises(ValueError, match="Unknown retrieval variant"):
             resolve_variant("nonexistent_config_xyz")
 
     def test_resolve_variant_with_params(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("bm25_grep", top_k=5, grep_top_k=3)
         assert variant.kb_search.top_k == 5
         assert variant.grep.top_k == 3
 
     def test_resolve_variant_alltools_top_k_applies_to_dual_pipelines(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("alltools", top_k=7)
         assert variant.kb_search_bm25 is not None
@@ -1095,13 +1095,13 @@ class TestRetrievalVariantRegistry:
         assert variant.kb_search_dense.top_k == 7
 
     def test_resolve_variant_all_tools_alias(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("AllTools")
         assert variant.name == "alltools"
 
     def test_resolve_variant_alltools_qwen(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("alltools-qwen")
         assert variant.kb_search_dense is not None
@@ -1109,7 +1109,7 @@ class TestRetrievalVariantRegistry:
         assert variant.kb_search_dense.embedder_model == "qwen3-embedding-8b"
 
     def test_bm25_variant(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("bm25", top_k=7)
         assert variant.name == "bm25"
@@ -1117,7 +1117,7 @@ class TestRetrievalVariantRegistry:
         assert variant.supports_top_k is True
 
     def test_grep_only_variant(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("grep_only", grep_top_k=3)
         assert variant.name == "grep_only"
@@ -1127,7 +1127,7 @@ class TestRetrievalVariantRegistry:
 
 class TestAllToolsEmbedderWarmupMapping:
     def test_unique_embedder_config_alltools_openai_defaults(self):
-        from tau2.knowledge.embeddings_cache import (
+        from tau3.knowledge.embeddings_cache import (
             get_unique_embedder_configs_for_retrieval_configs,
         )
 
@@ -1135,7 +1135,7 @@ class TestAllToolsEmbedderWarmupMapping:
         assert configs == [("openai", {"model": "text-embedding-3-large"})]
 
     def test_unique_embedder_config_alltools_qwen(self):
-        from tau2.knowledge.embeddings_cache import (
+        from tau3.knowledge.embeddings_cache import (
             get_unique_embedder_configs_for_retrieval_configs,
         )
 
@@ -1143,7 +1143,7 @@ class TestAllToolsEmbedderWarmupMapping:
         assert configs == [("openrouter", {"model": "qwen3-embedding-8b"})]
 
     def test_unique_embedder_config_alltools_variants_dedupe(self):
-        from tau2.knowledge.embeddings_cache import (
+        from tau3.knowledge.embeddings_cache import (
             get_unique_embedder_configs_for_retrieval_configs,
         )
 
@@ -1156,7 +1156,7 @@ class TestAllToolsEmbedderWarmupMapping:
         ]
 
     def test_unique_embedder_config_all_tools_alias(self):
-        from tau2.knowledge.embeddings_cache import (
+        from tau3.knowledge.embeddings_cache import (
             get_unique_embedder_configs_for_retrieval_configs,
         )
 
@@ -1166,8 +1166,8 @@ class TestAllToolsEmbedderWarmupMapping:
 
 class TestBankingKnowledgeRunConfigDefaults:
     def test_text_run_config_defaults_retrieval_to_domain_default(self):
-        from tau2.data_model.simulation import TextRunConfig
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.data_model.simulation import TextRunConfig
+        from tau3.domains.banking_knowledge.retrieval import (
             DEFAULT_RETRIEVAL_VARIANT,
         )
 
@@ -1177,7 +1177,7 @@ class TestBankingKnowledgeRunConfigDefaults:
         assert cfg.retrieval_config == "bm25_grep"
 
     def test_explicit_retrieval_config_is_preserved(self):
-        from tau2.data_model.simulation import TextRunConfig
+        from tau3.data_model.simulation import TextRunConfig
 
         cfg = TextRunConfig(
             domain="banking_knowledge",
@@ -1191,7 +1191,7 @@ class TestNoKnowledgeVariant:
     """Tests for the no_knowledge retrieval variant."""
 
     def test_no_retrieval_specs(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("no_knowledge")
         assert variant.kb_search is None
@@ -1199,7 +1199,7 @@ class TestNoKnowledgeVariant:
         assert variant.shell is None
 
     def test_name(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         assert resolve_variant("no_knowledge").name == "no_knowledge"
 
@@ -1208,7 +1208,7 @@ class TestFullKBVariant:
     """Tests for the full_kb retrieval variant."""
 
     def test_no_retrieval_specs(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("full_kb")
         assert variant.kb_search is None
@@ -1216,7 +1216,7 @@ class TestFullKBVariant:
         assert variant.shell is None
 
     def test_name(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         assert resolve_variant("full_kb").name == "full_kb"
 
@@ -1225,7 +1225,7 @@ class TestGoldenRetrievalVariant:
     """Tests for the golden_retrieval retrieval variant."""
 
     def test_no_retrieval_specs(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("golden_retrieval")
         assert variant.kb_search is None
@@ -1233,12 +1233,12 @@ class TestGoldenRetrievalVariant:
         assert variant.shell is None
 
     def test_name(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         assert resolve_variant("golden_retrieval").name == "golden_retrieval"
 
     def test_uses_golden_prompt_builder(self):
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             golden_prompt,
             resolve_variant,
         )
@@ -1248,7 +1248,7 @@ class TestGoldenRetrievalVariant:
 
     def test_golden_prompt_with_no_task(self):
         """golden_prompt should handle the case where task is None gracefully."""
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             golden_prompt,
             resolve_variant,
         )
@@ -1277,21 +1277,21 @@ class TestBM25GrepVariant:
         return kb
 
     def test_name(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         assert resolve_variant("bm25_grep").name == "bm25_grep"
 
     def test_supports_top_k(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         assert resolve_variant("bm25_grep").supports_top_k is True
 
-    @patch("tau2.domains.banking_knowledge.retrieval.get_or_create_docs")
+    @patch("tau3.domains.banking_knowledge.retrieval.get_or_create_docs")
     def test_build_tools_has_kb_search_and_grep(self, mock_get_docs, mock_kb):
         """bm25_grep should provide a toolkit with KB_search and grep tools."""
         mock_get_docs.return_value = SAMPLE_DOCUMENTS
-        from tau2.domains.banking_knowledge.data_model import TransactionalDB
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.data_model import TransactionalDB
+        from tau3.domains.banking_knowledge.retrieval import (
             build_tools,
             resolve_variant,
         )
@@ -1302,16 +1302,16 @@ class TestBM25GrepVariant:
         assert toolkit.has_tool("KB_search")
         assert toolkit.has_tool("grep")
 
-    @patch("tau2.domains.banking_knowledge.retrieval.get_or_create_docs")
+    @patch("tau3.domains.banking_knowledge.retrieval.get_or_create_docs")
     def test_build_tools_returns_correct_toolkit_class(self, mock_get_docs, mock_kb):
         """build_tools should return KnowledgeToolsWithKBSearchAndGrep."""
         mock_get_docs.return_value = SAMPLE_DOCUMENTS
-        from tau2.domains.banking_knowledge.data_model import TransactionalDB
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.data_model import TransactionalDB
+        from tau3.domains.banking_knowledge.retrieval import (
             build_tools,
             resolve_variant,
         )
-        from tau2.domains.banking_knowledge.retrieval_toolkits import (
+        from tau3.domains.banking_knowledge.retrieval_toolkits import (
             KnowledgeToolsWithKBSearchAndGrep,
         )
 
@@ -1338,15 +1338,15 @@ class TestGrepOnlyVariant:
         return kb
 
     def test_name(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         assert resolve_variant("grep_only").name == "grep_only"
 
-    @patch("tau2.domains.banking_knowledge.retrieval.get_or_create_docs")
+    @patch("tau3.domains.banking_knowledge.retrieval.get_or_create_docs")
     def test_build_tools_has_grep(self, mock_get_docs, mock_kb):
         mock_get_docs.return_value = SAMPLE_DOCUMENTS
-        from tau2.domains.banking_knowledge.data_model import TransactionalDB
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.data_model import TransactionalDB
+        from tau3.domains.banking_knowledge.retrieval import (
             build_tools,
             resolve_variant,
         )
@@ -1375,15 +1375,15 @@ class TestBM25Variant:
         return kb
 
     def test_name(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         assert resolve_variant("bm25").name == "bm25"
 
-    @patch("tau2.domains.banking_knowledge.retrieval.get_or_create_docs")
+    @patch("tau3.domains.banking_knowledge.retrieval.get_or_create_docs")
     def test_build_tools_has_kb_search(self, mock_get_docs, mock_kb):
         mock_get_docs.return_value = SAMPLE_DOCUMENTS
-        from tau2.domains.banking_knowledge.data_model import TransactionalDB
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.data_model import TransactionalDB
+        from tau3.domains.banking_knowledge.retrieval import (
             build_tools,
             resolve_variant,
         )
@@ -1404,9 +1404,9 @@ class TestToolCreation:
 
     @pytest.fixture
     def bm25_pipeline(self):
-        import tau2.knowledge.document_preprocessors.bm25_indexer  # noqa: F401
-        import tau2.knowledge.retrievers.bm25_retriever  # noqa: F401
-        from tau2.knowledge.pipeline import RetrievalPipeline
+        import tau3.knowledge.document_preprocessors.bm25_indexer  # noqa: F401
+        import tau3.knowledge.retrievers.bm25_retriever  # noqa: F401
+        from tau3.knowledge.pipeline import RetrievalPipeline
 
         config = {
             "document_preprocessors": [
@@ -1428,8 +1428,8 @@ class TestToolCreation:
 
     @pytest.fixture
     def grep_pipeline(self):
-        import tau2.knowledge.retrievers.grep_retriever  # noqa: F401
-        from tau2.knowledge.pipeline import RetrievalPipeline
+        import tau3.knowledge.retrievers.grep_retriever  # noqa: F401
+        from tau3.knowledge.pipeline import RetrievalPipeline
 
         config = {
             "retriever": {
@@ -1443,8 +1443,8 @@ class TestToolCreation:
 
     @pytest.fixture
     def kb_search_toolkit(self, bm25_pipeline):
-        from tau2.domains.banking_knowledge.data_model import TransactionalDB
-        from tau2.domains.banking_knowledge.retrieval_toolkits import (
+        from tau3.domains.banking_knowledge.data_model import TransactionalDB
+        from tau3.domains.banking_knowledge.retrieval_toolkits import (
             KnowledgeToolsWithKBSearch,
         )
 
@@ -1453,8 +1453,8 @@ class TestToolCreation:
 
     @pytest.fixture
     def grep_toolkit(self, grep_pipeline):
-        from tau2.domains.banking_knowledge.data_model import TransactionalDB
-        from tau2.domains.banking_knowledge.retrieval_toolkits import (
+        from tau3.domains.banking_knowledge.data_model import TransactionalDB
+        from tau3.domains.banking_knowledge.retrieval_toolkits import (
             KnowledgeToolsWithGrep,
         )
 
@@ -1496,7 +1496,7 @@ class TestToolCreation:
         assert "doc_5" in output
 
     def test_rewrite_context_tool(self):
-        from tau2.domains.banking_knowledge.retrieval_mixins import RewriteContextMixin
+        from tau3.domains.banking_knowledge.retrieval_mixins import RewriteContextMixin
 
         # RewriteContextMixin needs no pipelines -- just instantiate a minimal class
         class _RewriteToolkit(RewriteContextMixin):
@@ -1532,10 +1532,10 @@ class TestEndToEndPipelines:
         kb.get_all_documents.return_value = doc_objs
         return kb
 
-    @patch("tau2.domains.banking_knowledge.retrieval.get_or_create_docs")
+    @patch("tau3.domains.banking_knowledge.retrieval.get_or_create_docs")
     def test_create_bm25_retrieval_pipeline(self, mock_get_docs, mock_kb):
         mock_get_docs.return_value = SAMPLE_DOCUMENTS
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             create_bm25_retrieval_pipeline,
         )
 
@@ -1544,10 +1544,10 @@ class TestEndToEndPipelines:
         assert len(results) <= 3
         assert results[0][0] == "doc_1"
 
-    @patch("tau2.domains.banking_knowledge.retrieval.get_or_create_docs")
+    @patch("tau3.domains.banking_knowledge.retrieval.get_or_create_docs")
     def test_create_grep_retrieval_pipeline(self, mock_get_docs, mock_kb):
         mock_get_docs.return_value = SAMPLE_DOCUMENTS
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             create_grep_retrieval_pipeline,
         )
 
@@ -1556,10 +1556,10 @@ class TestEndToEndPipelines:
         doc_ids = [d for d, _ in results]
         assert "doc_1" in doc_ids
 
-    @patch("tau2.domains.banking_knowledge.retrieval.get_or_create_docs")
+    @patch("tau3.domains.banking_knowledge.retrieval.get_or_create_docs")
     def test_create_grep_case_sensitive(self, mock_get_docs, mock_kb):
         mock_get_docs.return_value = SAMPLE_DOCUMENTS
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             create_grep_retrieval_pipeline,
         )
 
@@ -1568,10 +1568,10 @@ class TestEndToEndPipelines:
         results = pipeline.retrieve("FEE")
         assert len(results) == 0
 
-    @patch("tau2.domains.banking_knowledge.retrieval.get_or_create_docs")
+    @patch("tau3.domains.banking_knowledge.retrieval.get_or_create_docs")
     def test_bm25_pipeline_batch_retrieval(self, mock_get_docs, mock_kb):
         mock_get_docs.return_value = SAMPLE_DOCUMENTS
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             create_bm25_retrieval_pipeline,
         )
 
@@ -1581,10 +1581,10 @@ class TestEndToEndPipelines:
         assert batch[0][0][0] == "doc_1"
         assert batch[1][0][0] == "doc_5"
 
-    @patch("tau2.domains.banking_knowledge.retrieval.get_or_create_docs")
+    @patch("tau3.domains.banking_knowledge.retrieval.get_or_create_docs")
     def test_grep_pipeline_batch_retrieval(self, mock_get_docs, mock_kb):
         mock_get_docs.return_value = SAMPLE_DOCUMENTS
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             create_grep_retrieval_pipeline,
         )
 
@@ -1592,12 +1592,12 @@ class TestEndToEndPipelines:
         batch = pipeline.retrieve_batch(["credit", "savings"])
         assert len(batch) == 2
 
-    @patch("tau2.domains.banking_knowledge.retrieval.get_or_create_docs")
+    @patch("tau3.domains.banking_knowledge.retrieval.get_or_create_docs")
     def test_bm25_grep_build_tools_e2e(self, mock_get_docs, mock_kb):
         """Full end-to-end test: bm25_grep variant → build_tools → call tools."""
         mock_get_docs.return_value = SAMPLE_DOCUMENTS
-        from tau2.domains.banking_knowledge.data_model import TransactionalDB
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.data_model import TransactionalDB
+        from tau3.domains.banking_knowledge.retrieval import (
             build_tools,
             resolve_variant,
         )
@@ -1615,11 +1615,11 @@ class TestEndToEndPipelines:
         grep_output = toolkit.grep(pattern="fee")
         assert "doc_1" in grep_output
 
-    @patch("tau2.domains.banking_knowledge.retrieval.get_or_create_docs")
+    @patch("tau3.domains.banking_knowledge.retrieval.get_or_create_docs")
     def test_grep_only_build_tools_e2e(self, mock_get_docs, mock_kb):
         mock_get_docs.return_value = SAMPLE_DOCUMENTS
-        from tau2.domains.banking_knowledge.data_model import TransactionalDB
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.data_model import TransactionalDB
+        from tau3.domains.banking_knowledge.retrieval import (
             build_tools,
             resolve_variant,
         )
@@ -1641,31 +1641,31 @@ class TestTerminalUseVariant:
     """Basic attribute/configuration tests for terminal_use variant."""
 
     def test_name(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("terminal_use")
         assert variant.name == "terminal_use"
 
     def test_supports_top_k_false(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         assert resolve_variant("terminal_use").supports_top_k is False
 
     def test_allow_writes_default(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("terminal_use")
         assert variant.shell is not None
         assert variant.shell.allow_writes is False
 
     def test_allow_writes_is_false(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("terminal_use")
         assert variant.shell.allow_writes is False
 
     def test_file_format_default(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("terminal_use")
         assert variant.shell.file_format == "md"
@@ -1675,19 +1675,19 @@ class TestTerminalUseWriteVariant:
     """Basic attribute tests for terminal_use_write variant."""
 
     def test_name(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("terminal_use_write")
         assert variant.name == "terminal_use_write"
 
     def test_allow_writes_true(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         variant = resolve_variant("terminal_use_write")
         assert variant.shell is not None
         assert variant.shell.allow_writes is True
 
     def test_supports_top_k_false(self):
-        from tau2.domains.banking_knowledge.retrieval import resolve_variant
+        from tau3.domains.banking_knowledge.retrieval import resolve_variant
 
         assert resolve_variant("terminal_use_write").supports_top_k is False

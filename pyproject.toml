@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "tau2"
+name = "tau3"
 version = "1.0.1"
 description = "tau-bench: Benchmarking tool-agent-user interaction in real-world domains"
 readme = "README.md"
@@ -56,14 +56,14 @@ experiments = [
     "scikit-learn>=1.6.1",
 ]
 all = [
-    "tau2[knowledge,gym,dev,experiments]",
+    "tau3[knowledge,gym,dev,experiments]",
 ]
 [project.urls]
 Homepage = "https://taubench.com/"
 Repository = "https://github.com/sierra-research/tau2-bench"
 
 [project.scripts]
-tau2 = "tau2.cli:main"
+tau3 = "tau3.cli:main"
 
 [tool.pytest.ini_options]
 filterwarnings = [

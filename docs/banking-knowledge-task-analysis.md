@@ -26,7 +26,7 @@ airline / retail / telecom 三个域把业务规则写在系统提示词里，�
 
 ### 任务集的基本形状
 
-`data/tau2/domains/banking_knowledge/tasks/` 下 97 个 `task_*.json`。`tasks.json` 是同一份数据的合并文件。
+`data/tau3/domains/banking_knowledge/tasks/` 下 97 个 `task_*.json`。`tasks.json` 是同一份数据的合并文件。
 
 | 维度 | 取值分布 | 说明 |
 |---|---|---|
@@ -164,7 +164,7 @@ initial_state                        │      ↓ user tools   ↓ agent tools  
 
 | 默认参数 | 值 | 来源 |
 |---|---|---|
-| max_steps / max_errors | 200 / 10 | `src/tau2/config.py` |
+| max_steps / max_errors | 200 / 10 | `src/tau3/config.py` |
 | 默认 agent / user LLM | `gpt-4.1-2025-04-14` | 可用 `--agent-llm` / `--user-llm` 覆盖 |
 | 温度 | 0.0 / 0.0 | agent / user |
 | seed / 并发 / 轮次 | 300 / 3 / 1 | pass^k 需要 `--num-trials > 1` |
@@ -206,7 +206,7 @@ task_004 / 008 / 012 / 014 / 032 / 033 / 034 / 035 / 083 改用 ACTION：金标�
 
 标准指标是 **pass^k**：同一任务跑 `num_trials` 次，`pass^k` 是「随机抽 k 次全部成功」的概率估计，因此 pass^1 就是平均奖励，k 增大衡量稳定性。框架同时统计读/写动作命中率、DB 匹配数、身份核验成功/失败数、各终止原因分布——排查失败时先看这些。
 
-> **版本兼容性**：`banking_knowledge` 的分数在 v1.0.1 前后**不可比**。除白名单修复外还有三处：数值参数整/浮点归一化（#397）、`get_bank_account_transactions_9173` 改为倒序返回（#403，否则「争议最早那一笔」的规则无法从工具输出判定）、task_074 金标准退费由 $8.00 更正为 $14.50（#374，这一项会让旧的通过轨迹变成失败）。旧结果可用 `tau2 evaluate-trajs --fresh-tasks` 重打分；要复现旧行为需 pin `pre-v1.0.1` 标签。
+> **版本兼容性**：`banking_knowledge` 的分数在 v1.0.1 前后**不可比**。除白名单修复外还有三处：数值参数整/浮点归一化（#397）、`get_bank_account_transactions_9173` 改为倒序返回（#403，否则「争议最早那一笔」的规则无法从工具输出判定）、task_074 金标准退费由 $8.00 更正为 $14.50（#374，这一项会让旧的通过轨迹变成失败）。旧结果可用 `tau3 evaluate-trajs --fresh-tasks` 重打分；要复现旧行为需 pin `pre-v1.0.1` 标签。
 
 ### 常见的归零原因
 
@@ -466,7 +466,7 @@ task_004 / 008 / 012 / 014 / 032 / 033 / 034 / 035 / 083 改用 ACTION：金标�
 ### 跑一次完整评测
 
 ```bash
-tau2 run --domain banking_knowledge \
+tau3 run --domain banking_knowledge \
   --retrieval-config alltools \
   --agent-llm <model> --user-llm gpt-4.1 \
   --num-trials 4
@@ -477,17 +477,17 @@ tau2 run --domain banking_knowledge \
 ### 重打分历史轨迹
 
 ```bash
-tau2 evaluate-trajs --fresh-tasks <results.json>
+tau3 evaluate-trajs --fresh-tasks <results.json>
 ```
 
 会应用当前版本的任务数据与 `read_log_allowlist`，是把 < v1.0.1 的结果搬到新口径的唯一正确方式。
 
 ### 关键源码位置
 
-- 任务数据 — `data/tau2/domains/banking_knowledge/tasks/`，文档 — 同目录 `documents/`，基线库 — `db.json`
-- 环境装配 — `src/tau2/domains/banking_knowledge/environment.py`
+- 任务数据 — `data/tau3/domains/banking_knowledge/tasks/`，文档 — 同目录 `documents/`，基线库 — `db.json`
+- 环境装配 — `src/tau3/domains/banking_knowledge/environment.py`
 - 48 个可发现工具与元工具 — 同目录 `tools.py`
 - 检索变体注册表 — 同目录 `retrieval.py`（`RETRIEVAL_VARIANTS`）
-- 判分 — `src/tau2/evaluator/evaluator.py`、`evaluator_env.py`、`evaluator_action.py`
-- 读白名单推导 — `src/tau2/runner/build.py` 的 `_derive_read_log_allowlist`
-- 官方说明 — `docs/evaluation.md`、`src/tau2/knowledge/README.md`、`CHANGELOG.md`
+- 判分 — `src/tau3/evaluator/evaluator.py`、`evaluator_env.py`、`evaluator_action.py`
+- 读白名单推导 — `src/tau3/runner/build.py` 的 `_derive_read_log_allowlist`
+- 官方说明 — `docs/evaluation.md`、`src/tau3/knowledge/README.md`、`CHANGELOG.md`

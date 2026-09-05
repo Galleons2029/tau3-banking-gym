@@ -89,7 +89,7 @@ Configure these options in your repository's release workflow:
 ```yaml
 # Key configuration options
 release-type: python          # Python project type
-package-name: tau2           # Your package name
+package-name: tau3           # Your package name
 version-file: pyproject.toml # Version location
 include-v-in-tag: true      # Creates v1.0.0 tags
 ```
@@ -230,7 +230,7 @@ Create `release-please-config.json`:
   "release-type": "python",
   "packages": {
     ".": {
-      "package-name": "tau2",
+      "package-name": "tau3",
       "changelog-sections": [
         {"type": "feat", "section": "Features"},
         {"type": "fix", "section": "Bug Fixes"},
@@ -248,9 +248,9 @@ For projects with multiple packages:
 ```json
 {
   "packages": {
-    "packages/core": {"package-name": "tau2-core"},
-    "packages/cli": {"package-name": "tau2-cli"},
-    "packages/web": {"package-name": "tau2-web"}
+    "packages/core": {"package-name": "tau3-core"},
+    "packages/cli": {"package-name": "tau3-cli"},
+    "packages/web": {"package-name": "tau3-web"}
   }
 }
 ```

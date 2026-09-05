@@ -2,9 +2,9 @@ import json
 
 import pytest
 
-from tau2.run import get_tasks
-from tau2.utils import DATA_DIR
-from tau2.utils.utils import get_dict_hash, show_dict_diff
+from tau3.run import get_tasks
+from tau3.utils import DATA_DIR
+from tau3.utils.utils import get_dict_hash, show_dict_diff
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ def task_with_initial_state_initialization_data_name():
 
 @pytest.fixture
 def tasks_dict():
-    task_file = DATA_DIR / "tau2" / "domains" / "mock" / "tasks.json"
+    task_file = DATA_DIR / "tau3" / "domains" / "mock" / "tasks.json"
     with open(task_file, "r") as f:
         task_dicts = json.load(f)
     tasks_dict = {v["id"]: v for v in task_dicts}

@@ -1,12 +1,12 @@
 # Experiments
 
-This directory contains **experimental code** that is offered as-is and should be treated as experimental components, not part of the core tau2 benchmark.
+This directory contains **experimental code** that is offered as-is and should be treated as experimental components, not part of the core tau3 benchmark.
 
 > ⚠️ **Important**: The code in this directory is experimental and may not be fully tested or supported. Use at your own discretion.
 
 ## Overview
 
-The `experiments/` folder is used for experimental features and research code that extends beyond the core tau2 benchmark. It can be used for new features, prototypes, and innovative approaches that are not part of the core evaluation framework. These components are provided for research purposes and to enable advanced use cases.
+The `experiments/` folder is used for experimental features and research code that extends beyond the core tau3 benchmark. It can be used for new features, prototypes, and innovative approaches that are not part of the core evaluation framework. These components are provided for research purposes and to enable advanced use cases.
 
 ## Directory Structure
 
@@ -25,10 +25,10 @@ To contribute experimental code:
 
 When working with experimental code:
 
-1. **Backward Compatibility**: Maintain compatibility with core tau2 interfaces when possible
+1. **Backward Compatibility**: Maintain compatibility with core tau3 interfaces when possible
 2. **Documentation**: Each experimental component should have its own README
 3. **Testing**: Include basic testing scripts and examples
-4. **Dependencies**: Manage dependencies carefully to avoid conflicts with core tau2
+4. **Dependencies**: Manage dependencies carefully to avoid conflicts with core tau3
 5. **Isolation**: Keep experimental code self-contained within this directory
 
 ## Contributing
@@ -49,4 +49,4 @@ Since this is experimental code:
 - **Use at your own risk** - test thoroughly before production use
 - **Documentation-first** - refer to individual README files for detailed usage
 
-For core tau2 benchmark support, see the main project documentation.
+For core tau3 benchmark support, see the main project documentation.

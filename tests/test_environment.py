@@ -2,23 +2,23 @@ from typing import Callable
 
 import pytest
 
-from tau2.data_model.message import (
+from tau3.data_model.message import (
     AssistantMessage,
     Message,
     ToolCall,
     ToolMessage,
     UserMessage,
 )
-from tau2.data_model.tasks import (
+from tau3.data_model.tasks import (
     EnvAssertion,
     EnvFunctionCall,
     InitializationData,
     Task,
 )
-from tau2.environment.environment import Environment
-from tau2.environment.tool import Tool
-from tau2.environment.toolkit import ToolKitBase, ToolType, is_tool
-from tau2.evaluator.evaluator_env import EnvironmentEvaluator
+from tau3.environment.environment import Environment
+from tau3.environment.tool import Tool
+from tau3.environment.toolkit import ToolKitBase, ToolType, is_tool
+from tau3.evaluator.evaluator_env import EnvironmentEvaluator
 
 
 @pytest.fixture

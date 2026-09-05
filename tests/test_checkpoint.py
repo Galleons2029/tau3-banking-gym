@@ -3,20 +3,20 @@
 import json
 import multiprocessing
 
-from tau2.data_model.simulation import (
+from tau3.data_model.simulation import (
     Info,
     Results,
     SimulationRun,
     TerminationReason,
     UserInfo,
 )
-from tau2.data_model.tasks import (
+from tau3.data_model.tasks import (
     EvaluationCriteria,
     Task,
     UserScenario,
 )
-from tau2.environment.environment import EnvironmentInfo
-from tau2.runner.checkpoint import (
+from tau3.environment.environment import EnvironmentInfo
+from tau3.runner.checkpoint import (
     create_checkpoint_replacer,
     create_checkpoint_saver,
     try_resume,

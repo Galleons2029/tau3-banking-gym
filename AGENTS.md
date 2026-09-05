@@ -15,7 +15,7 @@ uv sync --extra gym            # + gymnasium RL interface
 uv sync --extra dev            # + pytest, ruff, pre-commit (required for committing)
 uv sync --extra experiments    # + plotting libs for src/experiments/
 uv sync --all-extras           # everything
-uv run tau2 check-data         # verify installation
+uv run tau3 check-data         # verify installation
 ```
 
 **Note:** `langfuse` and `redis` are not declared dependencies but may be needed if you enable `USE_LANGFUSE=True` or `LLM_CACHE_ENABLED=True` with `redis` cache type in `config.py`. Install them manually if needed (`uv pip install langfuse redis`).
@@ -46,22 +46,22 @@ Required keys depend on the task:
 
 ```bash
 # Standard text run (defaults to the bm25_grep retrieval config)
-tau2 run --domain banking_knowledge --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 1 --num-tasks 5
+tau3 run --domain banking_knowledge --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 1 --num-tasks 5
 
 # Pick a different retrieval pipeline
-tau2 run --domain banking_knowledge --retrieval-config qwen_embeddings --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-tasks 5
+tau3 run --domain banking_knowledge --retrieval-config qwen_embeddings --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-tasks 5
 ```
 
-Results go to `data/simulations/`. Use `tau2 view` to browse them.
+Results go to `data/simulations/`. Use `tau3 view` to browse them.
 
 ## Architecture
 
 ```
-src/tau2/
+src/tau3/
 ├── agent/           # Agent implementations (half-duplex)
 ├── api_service/     # FastAPI-based API service
 ├── config.py        # Central configuration (single source of truth for defaults)
-├── cli.py           # CLI entry point (tau2 command)
+├── cli.py           # CLI entry point (tau3 command)
 ├── data_model/      # Pydantic data models (messages, trajectories, etc.)
 ├── domains/         # Domain definitions (banking_knowledge, mock)
 ├── environment/     # Environment, DB, server, toolkit base classes
@@ -88,7 +88,7 @@ Other top-level directories:
 
 ### Registry System
 
-All agents, domains, tasks, and user simulators are registered in `src/tau2/registry.py`. To add a new component, register it there:
+All agents, domains, tasks, and user simulators are registered in `src/tau3/registry.py`. To add a new component, register it there:
 
 ```python
 registry.register_agent_factory(create_my_agent, "my_agent")
@@ -109,16 +109,16 @@ For LLM-based agents, mix in `LLMConfigMixin` to add `llm` and `llm_args` parame
 
 ### Domain Structure
 
-Each domain (`src/tau2/domains/<name>/`) contains:
+Each domain (`src/tau3/domains/<name>/`) contains:
 - `data_model.py` — DB subclass with domain data models
 - `tools.py` — `ToolKitBase` subclass with domain tools
 - `environment.py` — `get_environment()`, `get_tasks()`, `get_tasks_split()`
 - `user_tools.py` (optional) — user-facing tools
 - `utils.py` — data paths and helpers
 
-Domain data lives in `data/tau2/domains/<name>/` (tasks.json, policy.md, db.json/toml, etc.).
+Domain data lives in `data/tau3/domains/<name>/` (tasks.json, policy.md, db.json/toml, etc.).
 
-**Note:** The `banking_knowledge` domain extends the standard pattern with additional files (`retrieval.py`, `retrieval_mixins.py`, `retrieval_toolkits.py`, `db_query.py`), dynamic tools and policy that vary by `--retrieval-config`, and a separate `knowledge/` retrieval pipeline module. Its data directory also includes `documents/`, `prompts/`, and `tasks/` subdirectories. See `src/tau2/knowledge/README.md` for details.
+**Note:** The `banking_knowledge` domain extends the standard pattern with additional files (`retrieval.py`, `retrieval_mixins.py`, `retrieval_toolkits.py`, `db_query.py`), dynamic tools and policy that vary by `--retrieval-config`, and a separate `knowledge/` retrieval pipeline module. Its data directory also includes `documents/`, `prompts/`, and `tasks/` subdirectories. See `src/tau3/knowledge/README.md` for details.
 
 ### Orchestrator
 
@@ -182,4 +182,4 @@ test: add integration tests for retail domain
 - **Task splits**: The `base` split is the default for evaluation. The `train`/`test` splits are for RL experiments.
 - **Pre-commit hook**: Runs `make check-all` (ruff lint + format). Fix any issues before committing.
 - **Notebooks**: Excluded from ruff (`*.ipynb` in pyproject.toml exclude).
-- **`banking_knowledge` domain**: Uses `--retrieval-config` to specify how the agent accesses the knowledge base. If omitted, defaults to `alltools` (BM25 + dense + shell; see `src/tau2/knowledge/README.md`). For offline-only, use e.g. `bm25`. Other offline configs: `no_knowledge`, `full_kb`, `golden_retrieval`, `bm25_grep`, `grep_only`. `openai_embeddings*` and default `alltools` require `OPENAI_API_KEY`. `qwen_embeddings*` and `alltools-qwen` require `OPENROUTER_API_KEY` (included in `.env.example`). `*_reranker` configs additionally require `OPENAI_API_KEY` for the LLM reranker. `terminal_use*`, `alltools`, and `alltools-qwen` require `sandbox-runtime`: install via `npm install -g @anthropic-ai/sandbox-runtime@0.0.23` **AND** the system tools it shells out to (`apt install ripgrep bubblewrap socat` on Linux, `brew install ripgrep` on macOS) — `SandboxManager` raises `SandboxRuntimeError` at construction time if any are missing. Embedding cache lives in `data/.embeddings_cache` (gitignored). See `src/tau2/knowledge/README.md` for full details.
+- **`banking_knowledge` domain**: Uses `--retrieval-config` to specify how the agent accesses the knowledge base. If omitted, defaults to `alltools` (BM25 + dense + shell; see `src/tau3/knowledge/README.md`). For offline-only, use e.g. `bm25`. Other offline configs: `no_knowledge`, `full_kb`, `golden_retrieval`, `bm25_grep`, `grep_only`. `openai_embeddings*` and default `alltools` require `OPENAI_API_KEY`. `qwen_embeddings*` and `alltools-qwen` require `OPENROUTER_API_KEY` (included in `.env.example`). `*_reranker` configs additionally require `OPENAI_API_KEY` for the LLM reranker. `terminal_use*`, `alltools`, and `alltools-qwen` require `sandbox-runtime`: install via `npm install -g @anthropic-ai/sandbox-runtime@0.0.23` **AND** the system tools it shells out to (`apt install ripgrep bubblewrap socat` on Linux, `brew install ripgrep` on macOS) — `SandboxManager` raises `SandboxRuntimeError` at construction time if any are missing. Embedding cache lives in `data/.embeddings_cache` (gitignored). See `src/tau3/knowledge/README.md` for full details.

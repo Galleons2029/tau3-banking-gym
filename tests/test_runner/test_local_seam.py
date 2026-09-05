@@ -8,14 +8,14 @@ checkpointed, and a resume runs nothing.
 import json
 import uuid
 
-from tau2.data_model.simulation import (
+from tau3.data_model.simulation import (
     SimulationRun,
     TerminationReason,
     TextRunConfig,
 )
-from tau2.run import get_tasks
-from tau2.runner import batch as batch_mod
-from tau2.runner.batch import run_tasks
+from tau3.run import get_tasks
+from tau3.runner import batch as batch_mod
+from tau3.runner.batch import run_tasks
 
 
 def _make_config(**overrides) -> TextRunConfig:

@@ -1,6 +1,6 @@
-"""Tests for rescoring trajectories with tau2.scripts.evaluate_trajectories."""
+"""Tests for rescoring trajectories with tau3.scripts.evaluate_trajectories."""
 
-from tau2.data_model.simulation import (
+from tau3.data_model.simulation import (
     Info,
     Results,
     RewardInfo,
@@ -8,11 +8,11 @@ from tau2.data_model.simulation import (
     TerminationReason,
     UserInfo,
 )
-from tau2.data_model.tasks import EvaluationCriteria, Task, UserScenario
-from tau2.environment.environment import EnvironmentInfo
-from tau2.run import get_tasks
-from tau2.scripts import evaluate_trajectories as evaluate_trajectories_module
-from tau2.scripts.evaluate_trajectories import compute_simulation_rewards
+from tau3.data_model.tasks import EvaluationCriteria, Task, UserScenario
+from tau3.environment.environment import EnvironmentInfo
+from tau3.run import get_tasks
+from tau3.scripts import evaluate_trajectories as evaluate_trajectories_module
+from tau3.scripts.evaluate_trajectories import compute_simulation_rewards
 
 # ---- Fixtures ----
 
@@ -85,7 +85,7 @@ class TestRegradingOptions:
         agent_discoverable_tools table via a per-task allowlist; re-grading
         must pass the same allowlist or required-read assertions silently
         stop discriminating."""
-        from tau2.data_model.tasks import Action
+        from tau3.data_model.tasks import Action
 
         task = _make_task("t0")
         task.evaluation_criteria = EvaluationCriteria(

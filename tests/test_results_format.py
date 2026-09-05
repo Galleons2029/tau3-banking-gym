@@ -6,7 +6,7 @@ import multiprocessing
 
 import pytest
 
-from tau2.data_model.simulation import (
+from tau3.data_model.simulation import (
     SIMULATIONS_DIR,
     Info,
     Results,
@@ -14,10 +14,10 @@ from tau2.data_model.simulation import (
     TerminationReason,
     UserInfo,
 )
-from tau2.data_model.tasks import EvaluationCriteria, Task, UserScenario
-from tau2.environment.environment import EnvironmentInfo
-from tau2.runner.checkpoint import create_checkpoint_fns, try_resume
-from tau2.utils.io_utils import load_results_dict
+from tau3.data_model.tasks import EvaluationCriteria, Task, UserScenario
+from tau3.environment.environment import EnvironmentInfo
+from tau3.runner.checkpoint import create_checkpoint_fns, try_resume
+from tau3.utils.io_utils import load_results_dict
 
 # ---- Fixtures ----
 

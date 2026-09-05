@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from loguru import logger
 
-logger.disable("tau2")
+logger.disable("tau3")
 
 requires_openai = pytest.mark.skipif(
     not os.environ.get("OPENAI_API_KEY"),
@@ -146,11 +146,11 @@ def _api_mark(gate):
 def _build_toolkit(variant_name: str, **kwargs):
     """Build a toolkit from DOCUMENTS with rerankers disabled."""
     with patch(
-        "tau2.domains.banking_knowledge.retrieval.get_or_create_docs",
+        "tau3.domains.banking_knowledge.retrieval.get_or_create_docs",
         return_value=DOCUMENTS,
     ):
-        from tau2.domains.banking_knowledge.data_model import TransactionalDB
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.data_model import TransactionalDB
+        from tau3.domains.banking_knowledge.retrieval import (
             build_tools,
             resolve_variant,
         )
@@ -166,14 +166,14 @@ def _build_toolkit(variant_name: str, **kwargs):
 
 
 def _clear_query_embedding_cache() -> None:
-    from tau2.knowledge import embeddings_cache as _mod
+    from tau3.knowledge import embeddings_cache as _mod
 
     _mod._query_embeddings_cache.clear()
 
 
 def _recall(pipeline, knowledge_base, top_k, use_content=False, max_tasks=10):
     """Shared recall computation for embedding pipeline tests."""
-    from tau2.domains.banking_knowledge.environment import get_tasks
+    from tau3.domains.banking_knowledge.environment import get_tasks
 
     tasks = get_tasks()
     tasks_with_docs = [t for t in tasks if t.required_documents][:max_tasks]
@@ -198,7 +198,7 @@ class TestAllVariantsToolPresence:
     """Every registered variant must expose exactly the right tools."""
 
     def test_all_variants_table_matches_registry(self):
-        from tau2.domains.banking_knowledge.retrieval import RETRIEVAL_VARIANTS
+        from tau3.domains.banking_knowledge.retrieval import RETRIEVAL_VARIANTS
 
         tested = {v for v, _, _ in _ALL_VARIANTS}
         registered = set(RETRIEVAL_VARIANTS.keys())
@@ -316,9 +316,9 @@ class TestLiveEmbeddingModelUsage:
 
     @requires_openrouter
     def test_qwen_variant_calls_openrouter_for_docs_and_query(self, tmp_path):
-        from tau2.knowledge.document_preprocessors import embedding_indexer
-        from tau2.knowledge.embedders.openrouter_embedder import OpenRouterEmbedder
-        from tau2.knowledge.embeddings_cache import EmbeddingsCache
+        from tau3.knowledge.document_preprocessors import embedding_indexer
+        from tau3.knowledge.embedders.openrouter_embedder import OpenRouterEmbedder
+        from tau3.knowledge.embeddings_cache import EmbeddingsCache
 
         _clear_query_embedding_cache()
         isolated_cache = EmbeddingsCache(cache_dir=str(tmp_path / "qwen_cache"))
@@ -345,9 +345,9 @@ class TestLiveEmbeddingModelUsage:
 
     @requires_openai
     def test_openai_variant_calls_openai_for_docs_and_query(self, tmp_path):
-        from tau2.knowledge.document_preprocessors import embedding_indexer
-        from tau2.knowledge.embedders.openai_embedder import OpenAIEmbedder
-        from tau2.knowledge.embeddings_cache import EmbeddingsCache
+        from tau3.knowledge.document_preprocessors import embedding_indexer
+        from tau3.knowledge.embedders.openai_embedder import OpenAIEmbedder
+        from tau3.knowledge.embeddings_cache import EmbeddingsCache
 
         _clear_query_embedding_cache()
         isolated_cache = EmbeddingsCache(cache_dir=str(tmp_path / "openai_cache"))
@@ -383,13 +383,13 @@ class TestProductionKBIntegrity:
 
     @pytest.fixture(scope="class")
     def knowledge_base(self):
-        from tau2.domains.banking_knowledge.environment import get_knowledge_base
+        from tau3.domains.banking_knowledge.environment import get_knowledge_base
 
         return get_knowledge_base()
 
     @pytest.fixture(scope="class")
     def tasks(self):
-        from tau2.domains.banking_knowledge.environment import get_tasks
+        from tau3.domains.banking_knowledge.environment import get_tasks
 
         return get_tasks()
 
@@ -421,13 +421,13 @@ class TestPipelineDocumentFidelity:
 
     @pytest.fixture(scope="class")
     def knowledge_base(self):
-        from tau2.domains.banking_knowledge.environment import get_knowledge_base
+        from tau3.domains.banking_knowledge.environment import get_knowledge_base
 
         return get_knowledge_base()
 
     @pytest.fixture(scope="class")
     def bm25_pipeline(self, knowledge_base):
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             create_bm25_retrieval_pipeline,
         )
 
@@ -459,7 +459,7 @@ class TestResolveVariantIsolation:
     """resolve_variant must deep-copy so overrides never mutate the registry."""
 
     def test_top_k_override_does_not_mutate_registry(self):
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             RETRIEVAL_VARIANTS,
             resolve_variant,
         )
@@ -469,7 +469,7 @@ class TestResolveVariantIsolation:
         assert RETRIEVAL_VARIANTS["bm25"].kb_search.top_k == original
 
     def test_grep_top_k_override_does_not_mutate_registry(self):
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             RETRIEVAL_VARIANTS,
             resolve_variant,
         )
@@ -484,7 +484,7 @@ class TestPolicyTemplateIntegrity:
 
     @pytest.fixture(scope="class")
     def knowledge_base(self):
-        from tau2.domains.banking_knowledge.environment import get_knowledge_base
+        from tau3.domains.banking_knowledge.environment import get_knowledge_base
 
         return get_knowledge_base()
 
@@ -507,7 +507,7 @@ class TestPolicyTemplateIntegrity:
         ],
     )
     def test_policy_renders_nonempty(self, variant_name, knowledge_base):
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             build_policy,
             resolve_variant,
         )
@@ -517,7 +517,7 @@ class TestPolicyTemplateIntegrity:
         assert len(policy) > 100
 
     def test_full_kb_policy_contains_all_documents(self, knowledge_base):
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             build_policy,
             resolve_variant,
         )
@@ -531,8 +531,8 @@ class TestPolicyTemplateIntegrity:
         assert missing == [], f"full_kb policy missing docs: {missing[:5]}"
 
     def test_golden_retrieval_policy_inlines_required_docs(self, knowledge_base):
-        from tau2.domains.banking_knowledge.environment import get_tasks
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.environment import get_tasks
+        from tau3.domains.banking_knowledge.retrieval import (
             build_policy,
             resolve_variant,
         )
@@ -553,8 +553,8 @@ class TestQueryStateIsolation:
 
     @pytest.fixture(scope="class")
     def bm25_pipeline(self):
-        from tau2.domains.banking_knowledge.environment import get_knowledge_base
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.environment import get_knowledge_base
+        from tau3.domains.banking_knowledge.retrieval import (
             create_bm25_retrieval_pipeline,
         )
 
@@ -583,19 +583,19 @@ class TestRequiredDocumentRetrievability:
 
     @pytest.fixture(scope="class")
     def knowledge_base(self):
-        from tau2.domains.banking_knowledge.environment import get_knowledge_base
+        from tau3.domains.banking_knowledge.environment import get_knowledge_base
 
         return get_knowledge_base()
 
     @pytest.fixture(scope="class")
     def tasks(self):
-        from tau2.domains.banking_knowledge.environment import get_tasks
+        from tau3.domains.banking_knowledge.environment import get_tasks
 
         return get_tasks()
 
     @pytest.fixture(scope="class")
     def grep_pipeline(self, knowledge_base):
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             create_grep_retrieval_pipeline,
         )
 
@@ -603,7 +603,7 @@ class TestRequiredDocumentRetrievability:
 
     @pytest.fixture(scope="class")
     def bm25_pipeline(self, knowledge_base):
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             create_bm25_retrieval_pipeline,
         )
 
@@ -647,7 +647,7 @@ class TestGetEnvironmentLivePath:
 
     @requires_all_tools_deps
     def test_default_variant_produces_valid_environment(self):
-        from tau2.domains.banking_knowledge.environment import get_environment
+        from tau3.domains.banking_knowledge.environment import get_environment
 
         env = get_environment()
         assert env.policy and len(env.policy) > 100
@@ -659,7 +659,7 @@ class TestGetEnvironmentLivePath:
         ["no_knowledge", "full_kb", "bm25", "bm25_grep", "grep_only"],
     )
     def test_get_environment_succeeds_for_offline_variants(self, variant_name):
-        from tau2.domains.banking_knowledge.environment import get_environment
+        from tau3.domains.banking_knowledge.environment import get_environment
 
         env = get_environment(retrieval_variant=variant_name)
         assert env.policy and len(env.policy) > 100
@@ -674,13 +674,13 @@ class TestGetEnvironmentLivePath:
         ],
     )
     def test_get_environment_succeeds_for_embedding_variants(self, variant_name):
-        from tau2.domains.banking_knowledge.environment import get_environment
+        from tau3.domains.banking_knowledge.environment import get_environment
 
         env = get_environment(retrieval_variant=variant_name)
         assert env.policy and len(env.policy) > 100
 
     def test_solo_mode_raises(self):
-        from tau2.domains.banking_knowledge.environment import get_environment
+        from tau3.domains.banking_knowledge.environment import get_environment
 
         with pytest.raises(ValueError, match="solo mode"):
             get_environment(solo_mode=True)
@@ -692,8 +692,8 @@ class TestGetEnvironmentLivePath:
 
 
 def _build_real_kb_embedding_pipeline(embedder_type: str, embedder_params: dict):
-    from tau2.domains.banking_knowledge.environment import get_knowledge_base
-    from tau2.domains.banking_knowledge.retrieval import (
+    from tau3.domains.banking_knowledge.environment import get_knowledge_base
+    from tau3.domains.banking_knowledge.retrieval import (
         create_embedding_retrieval_pipeline,
     )
 
@@ -726,7 +726,7 @@ class TestQwenEmbeddingPipelineRigorous:
         assert pipeline.state["doc_embeddings"].shape[1] == 4096
 
     def test_query_embedding_matches_doc_dimension(self, pipeline):
-        from tau2.knowledge.pipeline import RetrievalResult
+        from tau3.knowledge.pipeline import RetrievalResult
 
         result = pipeline.retrieve("test query", return_timing=True)
         assert isinstance(result, RetrievalResult)
@@ -781,14 +781,14 @@ class TestQwenInstructionPrefixImpact:
 
     @pytest.fixture(scope="class")
     def doc_embedding(self):
-        from tau2.knowledge.embedders.openrouter_embedder import OpenRouterEmbedder
+        from tau3.knowledge.embedders.openrouter_embedder import OpenRouterEmbedder
 
         embedder = OpenRouterEmbedder(model="qwen3-embedding-8b", query_instruction="")
         return embedder.embed([DOCUMENTS[0]["text"]])[0]
 
     @pytest.fixture(scope="class")
     def correct_query_embedding(self):
-        from tau2.knowledge.embedders.openrouter_embedder import OpenRouterEmbedder
+        from tau3.knowledge.embedders.openrouter_embedder import OpenRouterEmbedder
 
         return OpenRouterEmbedder(
             model="qwen3-embedding-8b",
@@ -797,7 +797,7 @@ class TestQwenInstructionPrefixImpact:
 
     @pytest.fixture(scope="class")
     def wrong_query_embedding(self):
-        from tau2.knowledge.embedders.openrouter_embedder import OpenRouterEmbedder
+        from tau3.knowledge.embedders.openrouter_embedder import OpenRouterEmbedder
 
         return OpenRouterEmbedder(
             model="qwen3-embedding-8b",
@@ -827,7 +827,7 @@ class TestQwenInstructionPrefixImpact:
         assert sim < 0.98, f"cosine={sim:.6f} — model may be ignoring instruction"
 
     def test_source_constant_matches_expected(self):
-        from tau2.knowledge.embedders.openrouter_embedder import (
+        from tau3.knowledge.embedders.openrouter_embedder import (
             DEFAULT_QWEN_QUERY_INSTRUCTION,
         )
 
@@ -859,7 +859,7 @@ class TestOpenAIEmbeddingPipelineRigorous:
         assert pipeline.state["doc_embeddings"].shape[1] == 3072
 
     def test_query_embedding_matches_doc_dimension(self, pipeline):
-        from tau2.knowledge.pipeline import RetrievalResult
+        from tau3.knowledge.pipeline import RetrievalResult
 
         result = pipeline.retrieve("test query", return_timing=True)
         assert isinstance(result, RetrievalResult)
@@ -893,29 +893,29 @@ class TestOpenAIEmbeddingPipelineRigorous:
 
 class TestInMemoryDocsCacheCorrectness:
     def setup_method(self):
-        from tau2.knowledge.embeddings_cache import clear_cached_docs
+        from tau3.knowledge.embeddings_cache import clear_cached_docs
 
         clear_cached_docs()
 
     def teardown_method(self):
-        from tau2.knowledge.embeddings_cache import clear_cached_docs
+        from tau3.knowledge.embeddings_cache import clear_cached_docs
 
         clear_cached_docs()
 
     def test_initially_empty(self):
-        from tau2.knowledge.embeddings_cache import get_cached_docs
+        from tau3.knowledge.embeddings_cache import get_cached_docs
 
         assert get_cached_docs() is None
 
     def test_set_then_get_returns_same(self):
-        from tau2.knowledge.embeddings_cache import get_cached_docs, set_cached_docs
+        from tau3.knowledge.embeddings_cache import get_cached_docs, set_cached_docs
 
         docs = [{"id": "a", "text": "hello"}]
         set_cached_docs(docs)
         assert get_cached_docs() is docs
 
     def test_clear_resets_to_none(self):
-        from tau2.knowledge.embeddings_cache import (
+        from tau3.knowledge.embeddings_cache import (
             clear_cached_docs,
             get_cached_docs,
             set_cached_docs,
@@ -926,7 +926,7 @@ class TestInMemoryDocsCacheCorrectness:
         assert get_cached_docs() is None
 
     def test_overwrite_replaces_old(self):
-        from tau2.knowledge.embeddings_cache import get_cached_docs, set_cached_docs
+        from tau3.knowledge.embeddings_cache import get_cached_docs, set_cached_docs
 
         set_cached_docs([{"id": "a", "text": "v1"}])
         docs_v2 = [{"id": "a", "text": "v2"}, {"id": "b", "text": "new"}]
@@ -945,7 +945,7 @@ class TestQueryEmbeddingCacheCorrectness:
     def test_same_query_same_config_returns_cached(self):
         import numpy as np
 
-        from tau2.knowledge.embeddings_cache import (
+        from tau3.knowledge.embeddings_cache import (
             cache_query_embedding,
             get_cached_query_embedding,
         )
@@ -959,7 +959,7 @@ class TestQueryEmbeddingCacheCorrectness:
     def test_different_query_returns_none(self):
         import numpy as np
 
-        from tau2.knowledge.embeddings_cache import (
+        from tau3.knowledge.embeddings_cache import (
             cache_query_embedding,
             get_cached_query_embedding,
         )
@@ -972,7 +972,7 @@ class TestQueryEmbeddingCacheCorrectness:
     def test_different_embedder_type_returns_none(self):
         import numpy as np
 
-        from tau2.knowledge.embeddings_cache import (
+        from tau3.knowledge.embeddings_cache import (
             cache_query_embedding,
             get_cached_query_embedding,
         )
@@ -985,7 +985,7 @@ class TestQueryEmbeddingCacheCorrectness:
     def test_different_model_returns_none(self):
         import numpy as np
 
-        from tau2.knowledge.embeddings_cache import (
+        from tau3.knowledge.embeddings_cache import (
             cache_query_embedding,
             get_cached_query_embedding,
         )
@@ -996,7 +996,7 @@ class TestQueryEmbeddingCacheCorrectness:
     def test_config_key_order_independent(self):
         import numpy as np
 
-        from tau2.knowledge.embeddings_cache import (
+        from tau3.knowledge.embeddings_cache import (
             cache_query_embedding,
             get_cached_query_embedding,
         )
@@ -1010,7 +1010,7 @@ class TestQueryEmbeddingCacheCorrectness:
     def test_different_instruction_prefix_is_separate_cache(self):
         import numpy as np
 
-        from tau2.knowledge.embeddings_cache import (
+        from tau3.knowledge.embeddings_cache import (
             cache_query_embedding,
             get_cached_query_embedding,
         )
@@ -1027,7 +1027,7 @@ class TestEncoderCacheConfigIncludesInstruction:
     """EmbeddingEncoder must include instruction prefix in the cache config."""
 
     def test_openrouter_encoder_includes_instruction(self):
-        from tau2.knowledge.input_preprocessors.embedding_encoder import (
+        from tau3.knowledge.input_preprocessors.embedding_encoder import (
             EmbeddingEncoder,
         )
 
@@ -1039,7 +1039,7 @@ class TestEncoderCacheConfigIncludesInstruction:
         assert "retrieve" in config["_query_instruction"].lower()
 
     def test_openai_encoder_has_no_instruction(self):
-        from tau2.knowledge.input_preprocessors.embedding_encoder import (
+        from tau3.knowledge.input_preprocessors.embedding_encoder import (
             EmbeddingEncoder,
         )
 
@@ -1050,7 +1050,7 @@ class TestEncoderCacheConfigIncludesInstruction:
         assert "_query_instruction" not in config
 
     def test_different_instructions_produce_different_configs(self):
-        from tau2.knowledge.input_preprocessors.embedding_encoder import (
+        from tau3.knowledge.input_preprocessors.embedding_encoder import (
             EmbeddingEncoder,
         )
 
@@ -1076,7 +1076,7 @@ class TestEncoderCacheConfigIncludesInstruction:
 class TestDiskEmbeddingsCacheCorrectness:
     @pytest.fixture
     def cache(self, tmp_path):
-        from tau2.knowledge.embeddings_cache import EmbeddingsCache
+        from tau3.knowledge.embeddings_cache import EmbeddingsCache
 
         return EmbeddingsCache(cache_dir=str(tmp_path / "test_cache"))
 
@@ -1201,7 +1201,7 @@ class TestCachePipelineIntegration:
         ],
     )
     def test_cached_pipeline_matches_fresh(self, embedder_type, embedder_params, query):
-        from tau2.domains.banking_knowledge.retrieval import (
+        from tau3.domains.banking_knowledge.retrieval import (
             create_embedding_retrieval_pipeline,
         )
 
@@ -1209,7 +1209,7 @@ class TestCachePipelineIntegration:
         pipelines = []
         for _ in range(2):
             with patch(
-                "tau2.domains.banking_knowledge.retrieval.get_or_create_docs",
+                "tau3.domains.banking_knowledge.retrieval.get_or_create_docs",
                 return_value=DOCUMENTS,
             ):
                 p = create_embedding_retrieval_pipeline(

@@ -3,9 +3,9 @@ import time
 
 import pytest
 
-from tau2.data_model.message import AssistantMessage, ToolCall, UserMessage
-from tau2.environment.tool import Tool
-from tau2.gym.gym_agent import GymAgent, GymAgentState
+from tau3.data_model.message import AssistantMessage, ToolCall, UserMessage
+from tau3.environment.tool import Tool
+from tau3.gym.gym_agent import GymAgent, GymAgentState
 
 from .utils import timeout
 
