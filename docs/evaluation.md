@@ -1,9 +1,17 @@
 # Task Schema and Evaluation
 
 This page explains how a task is scored in τ-bench and — most importantly —
-**what `evaluation_criteria.actions` actually does**. If you have looked at
-`data/tau2/domains/airline/tasks.json` and assumed those listed actions are
-required of the agent, this page is for you.
+**what `evaluation_criteria.actions` actually does**. If you have looked at a
+domain's `tasks.json` and assumed those listed actions are required of the
+agent, this page is for you.
+
+> **Note on the airline / retail / telecom examples below.** This fork bundles
+> only `banking_knowledge` and `mock`; the three original τ-bench domains have
+> been removed. They are kept in the discussion because the design decision
+> being explained — that `actions` is a reference trajectory rather than a
+> requirement — was made for those domains, and `banking_knowledge` is the
+> counter-example that does use `RewardType.ACTION`. The file paths and the
+> worked example therefore refer to upstream τ-bench, not to this tree.
 
 ## TL;DR
 

@@ -23,7 +23,7 @@ tau2 run \
 
 | Option | Description |
 |--------|-------------|
-| `--domain`, `-d` | Domain to evaluate: `airline`, `retail`, `telecom`, `mock`, `banking_knowledge` |
+| `--domain`, `-d` | Domain to evaluate: `banking_knowledge`, `mock` |
 | `--agent-llm` | LLM model for the agent |
 | `--user-llm` | LLM model for the user simulator |
 | `--agent-llm-args` | JSON dict of extra args for agent LLM (e.g. `'{"temperature": 0.5}'`) |
@@ -59,7 +59,7 @@ tau2 run \
 
 ```bash
 # Standard text evaluation
-tau2 run --domain airline --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 1 --num-tasks 5
+tau2 run --domain banking_knowledge --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 1 --num-tasks 5
 
 # Knowledge retrieval with BM25
 tau2 run --domain banking_knowledge --retrieval-config bm25 \
@@ -83,7 +83,7 @@ tau2 play
 
 Play mode allows you to:
 - **Play as Agent**: Manually control the agent's responses and tool calls
-- **Play as User**: Control the user while an LLM agent handles requests (available in domains with user tools like telecom)
+- **Play as User**: Control the user while an LLM agent handles requests (available in domains with user tools, such as `banking_knowledge`)
 - **Understand tasks** by walking through scenarios step-by-step
 - **Test strategies** before implementing them in code
 - **Choose task splits** to practice on training data or test on held-out tasks
@@ -252,10 +252,10 @@ make env-cli
 $ make env-cli
 
 Welcome to the Environment CLI!
-Connected to airline domain.
+Connected to banking_knowledge domain.
 
-Query (:n new session, :d change domain, :q quit)> What flights are available from SF to LA tomorrow?
-Assistant: Let me check the flight availability for you...
+Query (:n new session, :d change domain, :q quit)> What is the annual fee on the premium credit card?
+Assistant: Let me look that up in the knowledge base...
 ```
 
 Useful for testing domain tools, debugging environment responses, and exploring domain functionality without starting the full server stack.
@@ -273,41 +273,24 @@ make test-all          # All tests (requires: uv sync --all-extras)
 
 ---
 
-## Advanced: Ablation Studies
+## Advanced: Alternative agent implementations
 
-The `telecom` domain supports ablation studies for research purposes.
+`--agent` selects the agent implementation. Besides the default `llm_agent`:
 
-### No-user mode
-
-The LLM is given all tools and information upfront (no user interaction):
-
-```bash
-tau2 run \
-  --domain telecom \
-  --agent llm_agent_solo \
-  --agent-llm gpt-4.1 \
-  --user dummy_user
-```
-
-### Oracle-plan mode
-
-The LLM is given an oracle plan, removing the need for action planning:
+- `llm_agent_gt` — the agent is handed an oracle plan, removing the need for
+  action planning. Only applies to tasks that carry a reference trajectory.
+- `llm_agent_solo` — the agent is given all tools and information upfront and
+  runs without a user (`--user dummy_user`). Note that `banking_knowledge`
+  rejects solo mode, so this currently only applies to `mock`.
 
 ```bash
 tau2 run \
-  --domain telecom \
+  --domain banking_knowledge \
   --agent llm_agent_gt \
   --agent-llm gpt-4.1 \
   --user-llm gpt-4.1
 ```
 
-### Workflow policy format
-
-Test the impact of policy format using the workflow policy for telecom:
-
-```bash
-tau2 run \
-  --domain telecom-workflow \
-  --agent-llm gpt-4.1 \
-  --user-llm gpt-4.1
-```
+> The ablation studies from the original τ-bench paper (no-user, oracle-plan
+> and workflow-policy runs on the `telecom` domain) are not reproducible here:
+> this fork bundles only `banking_knowledge` and `mock`.

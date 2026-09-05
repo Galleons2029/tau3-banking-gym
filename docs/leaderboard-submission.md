@@ -13,7 +13,7 @@ This harness produces text (half-duplex) submissions. Start with
 
 Your submission should meet these constraints:
 
-1. **Domain coverage** — we recommend including results for all current text domains (`banking_knowledge`, `retail`, `airline`, `telecom`). You may submit results for a single domain; the leaderboard ranks submissions per domain.
+1. **Domain coverage** — the leaderboard ranks submissions per domain and accepts `banking_knowledge`, `retail`, `airline` and `telecom`. Note that this fork bundles only `banking_knowledge` and `mock`: the retail/airline/telecom fields and examples below exist to keep the submission schema compatible with the historical entries already on the leaderboard, but those domains cannot be run from this tree. Use upstream τ-bench to produce results for them.
 2. **Consistent model configuration** — all trajectory files must use the same agent model and user simulator with identical arguments across all domains
 3. **One result per domain** — each domain should appear exactly once
 4. **All tasks completed** — run evaluation on all tasks within each domain (don't use `--task-ids` or `--num-tasks` filters)

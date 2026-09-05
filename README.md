@@ -45,7 +45,7 @@ Each domain specifies:
 - A set of **tasks** to evaluate the agent's performance
 - Optionally: a set of **user tools** for the user simulator
 
-**Available domains**: `mock` · `airline` · `retail` · `telecom` · `banking_knowledge`
+**Available domains**: `banking_knowledge` · `mock`
 
 ## Quick Start
 
@@ -54,7 +54,7 @@ Each domain specifies:
 ```bash
 git clone https://github.com/sierra-research/tau2-bench
 cd tau2-bench
-uv sync                        # core only (text-mode: airline, retail, telecom, mock)
+uv sync                        # core only (text-mode: mock)
 ```
 
 Optional extras (install what you need):
@@ -78,7 +78,7 @@ cp .env.example .env
 ### 3. Run an evaluation
 
 ```bash
-tau2 run --domain airline --agent-llm gpt-4.1 --user-llm gpt-4.1 \
+tau2 run --domain banking_knowledge --agent-llm gpt-4.1 --user-llm gpt-4.1 \
   --num-trials 1 --num-tasks 5
 ```
 

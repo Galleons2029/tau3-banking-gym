@@ -4,12 +4,12 @@
 
 ## Project Overview
 
-τ-bench is a simulation framework for evaluating conversational customer service agents. It runs text half-duplex (turn-based) simulations. Domains include `mock`, `airline`, `retail`, `telecom`, and `banking_knowledge`.
+τ-bench is a simulation framework for evaluating conversational customer service agents. It runs text half-duplex (turn-based) simulations. Domains are `banking_knowledge` and `mock`.
 
 ## Setup
 
 ```bash
-uv sync                        # core only (airline, retail, telecom, mock)
+uv sync                        # core only (mock)
 uv sync --extra knowledge      # + banking_knowledge domain (retrieval pipeline)
 uv sync --extra gym            # + gymnasium RL interface
 uv sync --extra dev            # + pytest, ruff, pre-commit (required for committing)
@@ -45,10 +45,10 @@ Required keys depend on the task:
 ## Running Evaluations
 
 ```bash
-# Standard text run
-tau2 run --domain airline --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 1 --num-tasks 5
+# Standard text run (defaults to the bm25_grep retrieval config)
+tau2 run --domain banking_knowledge --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 1 --num-tasks 5
 
-# Knowledge domain (requires --retrieval-config)
+# Pick a different retrieval pipeline
 tau2 run --domain banking_knowledge --retrieval-config qwen_embeddings --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-tasks 5
 ```
 
@@ -63,7 +63,7 @@ src/tau2/
 ├── config.py        # Central configuration (single source of truth for defaults)
 ├── cli.py           # CLI entry point (tau2 command)
 ├── data_model/      # Pydantic data models (messages, trajectories, etc.)
-├── domains/         # Domain definitions (airline, mock, retail, telecom, banking_knowledge)
+├── domains/         # Domain definitions (banking_knowledge, mock)
 ├── environment/     # Environment, DB, server, toolkit base classes
 ├── evaluator/       # Task evaluation logic
 ├── gym/             # Gymnasium-compatible RL interface

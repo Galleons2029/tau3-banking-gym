@@ -21,15 +21,15 @@ Each layer builds on the one below it, but you can enter at any level depending 
 The fastest way to run simulations is through the `tau2 run` command:
 
 ```bash
-# Run all airline tasks with GPT-4.1
-tau2 run --domain airline --agent llm_agent --agent-llm openai/gpt-4.1
+# Run all banking_knowledge tasks with GPT-4.1
+tau2 run --domain banking_knowledge --agent llm_agent --agent-llm openai/gpt-4.1
 
 # Run specific tasks with multiple trials
-tau2 run --domain retail --agent llm_agent --agent-llm openai/gpt-4.1 \
-    --task-ids 0 1 --num-trials 3
+tau2 run --domain banking_knowledge --agent llm_agent --agent-llm openai/gpt-4.1 \
+    --task-ids task_001 task_002 --num-trials 3
 
 # Run with concurrency and auto-resume
-tau2 run --domain telecom --agent llm_agent --agent-llm openai/gpt-4.1 \
+tau2 run --domain banking_knowledge --agent llm_agent --agent-llm openai/gpt-4.1 \
     --max-concurrency 4 --auto-resume
 ```
 
@@ -48,7 +48,7 @@ from tau2 import TextRunConfig
 from tau2.runner import run_domain
 
 config = TextRunConfig(
-    domain="airline",
+    domain="banking_knowledge",
     agent="llm_agent",
     llm_agent="openai/gpt-4.1",
     llm_user="openai/gpt-4.1-mini",
@@ -94,13 +94,13 @@ from tau2 import TextRunConfig
 from tau2.runner import get_tasks, run_tasks
 
 config = TextRunConfig(
-    domain="airline",
+    domain="banking_knowledge",
     agent="llm_agent",
     llm_agent="openai/gpt-4.1",
 )
 
 # Load and filter tasks manually
-tasks = get_tasks("airline", task_ids=["0", "1"])
+tasks = get_tasks("banking_knowledge", task_ids=["task_001", "task_002"])
 
 # Run with custom save path
 results = run_tasks(
@@ -117,8 +117,8 @@ results = run_tasks(
 from tau2 import TextRunConfig
 from tau2.runner import run_single_task, get_tasks
 
-config = TextRunConfig(domain="airline", agent="llm_agent", llm_agent="openai/gpt-4.1")
-tasks = get_tasks("airline")
+config = TextRunConfig(domain="banking_knowledge", agent="llm_agent", llm_agent="openai/gpt-4.1")
+tasks = get_tasks("banking_knowledge")
 
 result = run_single_task(config, tasks[0], seed=42)
 print(f"Task {result.task_id}: reward={result.reward_info.reward}")
@@ -148,17 +148,17 @@ from tau2.runner import (
 from tau2.evaluator.evaluator import EvaluationType
 
 # Load a task
-tasks = get_tasks("airline")
+tasks = get_tasks("banking_knowledge")
 task = tasks[0]
 
 # Option A: Build orchestrator from config (uses registry)
 from tau2 import TextRunConfig
-config = TextRunConfig(domain="airline", agent="llm_agent", llm_agent="openai/gpt-4.1")
+config = TextRunConfig(domain="banking_knowledge", agent="llm_agent", llm_agent="openai/gpt-4.1")
 orchestrator = build_orchestrator(config, task, seed=42)
 result = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
 
 # Option B: Build components individually
-env = build_environment("airline")
+env = build_environment("banking_knowledge")
 agent = build_agent("llm_agent", env, llm="openai/gpt-4.1")
 user = build_user("user_simulator", env, task, llm="openai/gpt-4.1-mini")
 ```

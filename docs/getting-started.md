@@ -19,7 +19,7 @@ cd tau2-bench
 ### 2. Install τ-bench
 
 ```bash
-uv sync                        # core only (text-mode: airline, retail, telecom, mock)
+uv sync                        # core only (text-mode: mock)
 ```
 
 This creates a virtual environment, installs core dependencies from the lockfile, and enables the `tau2` command. The Python version is pinned via `.python-version` (3.12) — uv will download it automatically if needed.
@@ -64,7 +64,7 @@ cp .env.example .env
 ### Standard text-based evaluation (half-duplex)
 
 ```bash
-tau2 run --domain airline --agent-llm gpt-4.1 --user-llm gpt-4.1 \
+tau2 run --domain banking_knowledge --agent-llm gpt-4.1 --user-llm gpt-4.1 \
   --num-trials 1 --num-tasks 5
 ```
 
