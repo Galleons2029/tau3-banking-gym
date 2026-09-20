@@ -224,6 +224,7 @@ data/calibrations/backups/
 # The console build is packaged and served by FastAPI.
 !web/visualizer/dist/
 !web/visualizer/dist/**
+web/visualizer/node_modules/
 
 # LaTeX build artifacts
 *.aux
