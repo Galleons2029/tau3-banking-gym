@@ -19,20 +19,23 @@ from tau3.config import (
     DEFAULT_SEED,
     DEFAULT_USER_IMPLEMENTATION,
 )
-from tau3.data_model.persona import PersonaConfig
-from tau3.data_model.simulation import TextRunConfig
-from tau3.domains.banking_knowledge.retrieval import get_all_variant_names
-from tau3.run import get_options, run_domain
-from tau3.runner.work import parse_provider_limits
 
 
 def get_all_retrieval_config_names():
+    from tau3.domains.banking_knowledge.retrieval import get_all_variant_names
+
     return get_all_variant_names()
 
 
 def add_run_args(parser):
+    from tau3.run import get_options
+
+    parser.add_argument(
+        "--task-bundle", help="Path to a published synthesis task bundle"
+    )
     """Add run arguments to a parser."""
-    domains = get_options().domains
+    options = get_options()
+    domains = options.domains
     parser.add_argument(
         "--domain",
         "-d",
@@ -50,7 +53,7 @@ def add_run_args(parser):
         "--agent",
         type=str,
         default=DEFAULT_AGENT_IMPLEMENTATION,
-        choices=get_options().agents,
+        choices=options.agents,
         help=f"The agent implementation to use. Default is {DEFAULT_AGENT_IMPLEMENTATION}.",
     )
     parser.add_argument(
@@ -68,7 +71,7 @@ def add_run_args(parser):
     parser.add_argument(
         "--user",
         type=str,
-        choices=get_options().users,
+        choices=options.users,
         default=DEFAULT_USER_IMPLEMENTATION,
         help=f"The user implementation to use. Default is {DEFAULT_USER_IMPLEMENTATION}.",
     )
@@ -88,7 +91,7 @@ def add_run_args(parser):
         "--task-set-name",
         type=str,
         default=None,
-        choices=get_options().task_sets,
+        choices=options.task_sets,
         help="The task set to run the simulation on. If not provided, will load default task set for the domain.",
     )
     parser.add_argument(
@@ -351,6 +354,9 @@ def run_intro():
     cmd_table.add_row("tau3 run", "Run a benchmark evaluation against a domain")
     cmd_table.add_row("tau3 view", "Browse and inspect simulation results")
     cmd_table.add_row(
+        "tau3 web", "Open the local visualization and calibration console"
+    )
+    cmd_table.add_row(
         "tau3 play", "Interactive manual mode \u2014 play the agent yourself"
     )
     cmd_table.add_row("tau3 domain <name>", "Show detailed documentation for a domain")
@@ -402,17 +408,57 @@ def run_intro():
     )
 
 
+def _add_web_args(parser: argparse.ArgumentParser) -> None:
+    """Add lightweight web-console arguments to an argparse parser."""
+
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8001)
+    parser.add_argument("--refresh-seconds", type=float, default=5.0)
+    parser.add_argument("--open", action="store_true", dest="open_browser")
+
+
+def _run_web_fast(argv: list[str]) -> None:
+    """Parse and start ``tau3 web`` without constructing every CLI command."""
+
+    parser = argparse.ArgumentParser(
+        prog="tau3 web",
+        description="Start the local visualization and calibration console",
+    )
+    _add_web_args(parser)
+    run_web_console(parser.parse_args(argv))
+
+
 def main():
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "web":
+        return _run_web_fast(sys.argv[2:])
+
     parser = argparse.ArgumentParser(
         description="tau3 — half-duplex agent gym for the banking_knowledge domain"
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    from tau3.perturb.cli import add_perturb_parser
+    from tau3.synthesis.cli import add_synthesis_parser
+
+    add_synthesis_parser(subparsers)
+
+    from tau3.worldgen.cli import add_worldgen_parser
+
+    add_worldgen_parser(subparsers)
+    add_perturb_parser(subparsers)
 
     # Run command
     run_parser = subparsers.add_parser("run", help="Run a benchmark")
     add_run_args(run_parser)
 
     def run_command(args):
+        from tau3.data_model.persona import PersonaConfig
+        from tau3.data_model.simulation import TextRunConfig
+        from tau3.run import run_domain
+        from tau3.runner.work import parse_provider_limits
+
         user_persona_config = None
         if args.user_persona:
             user_persona_config = PersonaConfig.from_dict(args.user_persona)  # noqa: F841
@@ -425,6 +471,7 @@ def main():
         # Shared config kwargs
         shared_kwargs = dict(
             domain=args.domain,
+            task_bundle=args.task_bundle,
             task_set_name=args.task_set_name,
             task_split_name=args.task_split_name,
             task_ids=args.task_ids,
@@ -505,6 +552,13 @@ def main():
         help="Show full tool results without truncation.",
     )
     view_parser.set_defaults(func=lambda args: run_view_simulations(args))
+
+    # Local web visualization and calibration console
+    web_parser = subparsers.add_parser(
+        "web", help="Start the local visualization and calibration console"
+    )
+    _add_web_args(web_parser)
+    web_parser.set_defaults(func=lambda args: run_web_console(args))
 
     # Domain command
     domain_parser = subparsers.add_parser("domain", help="Show domain documentation")
@@ -773,6 +827,19 @@ def run_view_simulations(args):
         only_show_all_failed=args.only_show_all_failed,
         sim_dir=args.dir,
         max_tool_result_length=max_tool_result_length,
+    )
+
+
+def run_web_console(args):
+    """Start the local visualization and calibration console."""
+    print("正在加载 tau3 Web 控制台（数据索引将在后台构建）...", flush=True)
+    from tau3.web_console.app import run_server
+
+    run_server(
+        host=args.host,
+        port=args.port,
+        refresh_seconds=args.refresh_seconds,
+        open_browser=args.open_browser,
     )
 
 

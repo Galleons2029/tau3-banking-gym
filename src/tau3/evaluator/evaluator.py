@@ -126,6 +126,21 @@ def evaluate_simulation(
 
     EnvEvaluator = EnvironmentEvaluator
     NLEvaluator = NLAssertionsEvaluator
+    if domain == "banking_synth":
+        from tau3.domains.banking_synth.environment import _is_v2
+        from tau3.worldgen.world import configured_world_root
+
+        if _is_v2(configured_world_root()):
+            from tau3.worldgen.v2.semantic import StrictSemanticEvaluator
+
+            NLEvaluator = StrictSemanticEvaluator
+            if evaluation_type not in {
+                EvaluationType.ALL,
+                EvaluationType.ALL_WITH_NL_ASSERTIONS,
+            }:
+                raise ValueError(
+                    "Certified V2 tasks require complete reward-basis evaluation (all)"
+                )
     CommEvaluator = CommunicateEvaluator
     ActEvaluator = ActionEvaluator
 

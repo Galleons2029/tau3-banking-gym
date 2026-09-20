@@ -10,7 +10,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-import httpx
 import litellm
 from litellm import completion, completion_cost
 from litellm.caching.caching import Cache
@@ -19,6 +18,8 @@ from loguru import logger
 
 from tau3.config import (
     DEFAULT_LLM_CACHE_TYPE,
+    DEFAULT_LLM_HTTP_MAX_CONNECTIONS,
+    DEFAULT_LLM_HTTP_MAX_KEEPALIVE_CONNECTIONS,
     DEFAULT_MAX_RETRIES,
     LLM_CACHE_ENABLED,
     REDIS_CACHE_TTL,
@@ -39,6 +40,7 @@ from tau3.data_model.message import (
     UserMessage,
 )
 from tau3.environment.tool import Tool
+from tau3.utils.llm_http import make_http_clients
 
 # Suppress Pydantic serialization warnings from LiteLLM
 # These occur due to type mismatches between streaming and non-streaming response types
@@ -48,10 +50,10 @@ warnings.filterwarnings(
     category=UserWarning,
 )
 
-# Configure httpx connection limits for LiteLLM
-httpx_limits = httpx.Limits(max_keepalive_connections=5, max_connections=10)
-litellm.client_session = httpx.Client(limits=httpx_limits)
-litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
+# Match the HTTP pool to an explicitly configured shared request ceiling.
+litellm.client_session, litellm.aclient_session = make_http_clients(
+    DEFAULT_LLM_HTTP_MAX_CONNECTIONS, DEFAULT_LLM_HTTP_MAX_KEEPALIVE_CONNECTIONS
+)
 
 # SiliconFlow deepseek-ai/DeepSeek-V4-Flash pricing (peak tier), in CNY not USD.
 litellm.register_model(
@@ -71,6 +73,26 @@ litellm.register_model(
 litellm.register_model(
     {
         "openai/GLM5.3-agentic-qs-h20": {
+            "input_cost_per_token": 0.0,
+            "output_cost_per_token": 0.0,
+            "litellm_provider": "openai",
+            "mode": "chat",
+        },
+    }
+)
+
+# Self-hosted OpenAI-compatible gateway used by the worldgen synthesis pipeline.
+# Same reasoning as above: no per-token billing, so registering at zero cost keeps
+# get_response_cost from logging a lookup error on every call.
+litellm.register_model(
+    {
+        "openai/gemini-3.5-flash": {
+            "input_cost_per_token": 0.0,
+            "output_cost_per_token": 0.0,
+            "litellm_provider": "openai",
+            "mode": "chat",
+        },
+        "openai/GLM-5.3-Flash": {
             "input_cost_per_token": 0.0,
             "output_cost_per_token": 0.0,
             "litellm_provider": "openai",

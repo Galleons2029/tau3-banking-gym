@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Callable, Dict, Optional
 
 from loguru import logger
@@ -264,6 +265,23 @@ try:
 
     registry.register_domain(knowledge_domain_get_environment, "banking_knowledge")
     registry.register_tasks(knowledge_domain_get_tasks, "banking_knowledge")
+
+    # A synthesized world is only reachable when one is configured. Registering it
+    # lazily keeps worldgen out of every process that merely touches the registry.
+    if os.environ.get("TAU3_SYNTH_WORLD", "").strip():
+
+        def synth_domain_get_environment(**kwargs) -> Environment:
+            from tau3.domains.banking_synth.environment import get_environment
+
+            return get_environment(**kwargs)
+
+        def synth_domain_get_tasks(task_split_name: Optional[str] = None) -> list[Task]:
+            from tau3.domains.banking_synth.environment import get_tasks
+
+            return get_tasks(task_split_name)
+
+        registry.register_domain(synth_domain_get_environment, "banking_synth")
+        registry.register_tasks(synth_domain_get_tasks, "banking_synth")
 
     logger.debug(
         f"Default components registered successfully. Registry info: {json.dumps(registry.get_info().model_dump(), indent=2)}"

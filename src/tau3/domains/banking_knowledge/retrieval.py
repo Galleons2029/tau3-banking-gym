@@ -14,6 +14,7 @@ Replaces the 18 ``RetrievalConfig`` subclasses in
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from dataclasses import dataclass
@@ -145,9 +146,25 @@ def format_full_knowledge_base(knowledge_base: KnowledgeBase) -> str:
 # ---------------------------------------------------------------------------
 
 
+def corpus_key(knowledge_base: KnowledgeBase) -> str:
+    """Identify a corpus by its contents.
+
+    The document cache is process-global, and a synthesized world and the
+    official corpus can be live in one process, so the key has to distinguish
+    them by content rather than by which one loaded first.
+    """
+    fingerprint = hashlib.sha256()
+    for doc_id in sorted(knowledge_base.documents):
+        doc = knowledge_base.documents[doc_id]
+        fingerprint.update(doc_id.encode())
+        fingerprint.update(hashlib.sha256(doc.content.encode()).digest())
+    return fingerprint.hexdigest()
+
+
 def get_or_create_docs(knowledge_base: KnowledgeBase) -> List[Dict[str, Any]]:
-    """Get documents from the knowledge base for indexing (cached)."""
-    cached_docs = get_cached_docs()
+    """Get documents from the knowledge base for indexing (cached per corpus)."""
+    key = corpus_key(knowledge_base)
+    cached_docs = get_cached_docs(key)
     if cached_docs is not None:
         return cached_docs
 
@@ -155,7 +172,7 @@ def get_or_create_docs(knowledge_base: KnowledgeBase) -> List[Dict[str, Any]]:
         {"id": doc.id, "text": doc.content, "title": doc.title}
         for doc in knowledge_base.documents.values()
     ]
-    set_cached_docs(docs)
+    set_cached_docs(docs, key)
     return docs
 
 

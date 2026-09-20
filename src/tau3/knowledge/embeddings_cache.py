@@ -8,23 +8,28 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
-_docs_cache: Optional[List[Dict[str, Any]]] = None
+# Keyed by corpus: a single unkeyed slot meant that whichever knowledge base was
+# loaded first in a process silently supplied documents to every later one, which
+# looks like unusually good retrieval rather than a bug.
+DEFAULT_DOCS_KEY = "default"
+_docs_cache: Dict[str, List[Dict[str, Any]]] = {}
 _query_embeddings_cache: Dict[str, np.ndarray] = {}
 
 
-def get_cached_docs() -> Optional[List[Dict[str, Any]]]:
-    global _docs_cache
-    return _docs_cache
+def get_cached_docs(key: str = DEFAULT_DOCS_KEY) -> Optional[List[Dict[str, Any]]]:
+    return _docs_cache.get(key)
 
 
-def set_cached_docs(docs: List[Dict[str, Any]]) -> None:
-    global _docs_cache
-    _docs_cache = docs
+def set_cached_docs(docs: List[Dict[str, Any]], key: str = DEFAULT_DOCS_KEY) -> None:
+    _docs_cache[key] = docs
 
 
-def clear_cached_docs() -> None:
-    global _docs_cache
-    _docs_cache = None
+def clear_cached_docs(key: Optional[str] = None) -> None:
+    """Drop one corpus's documents, or every corpus when no key is given."""
+    if key is None:
+        _docs_cache.clear()
+    else:
+        _docs_cache.pop(key, None)
 
 
 def _compute_query_cache_key(
@@ -513,6 +518,7 @@ def get_embeddings_cache() -> EmbeddingsCache:
 
 def warm_kb_cache(
     embedder_configs: Optional[List[Tuple[str, Dict[str, Any]]]] = None,
+    knowledge_base: Optional[Any] = None,
 ) -> List[Dict[str, Any]]:
     """Pre-warm the knowledge base cache with documents and embeddings.
 
@@ -528,21 +534,25 @@ def warm_kb_cache(
         List of documents (for use in pipelines)
     """
     from tau3.domains.banking_knowledge.environment import get_knowledge_base
+    from tau3.domains.banking_knowledge.retrieval import corpus_key
 
     cache = get_embeddings_cache()
 
-    cached_docs = get_cached_docs()
+    if knowledge_base is None:
+        knowledge_base = get_knowledge_base()
+    key = corpus_key(knowledge_base)
+
+    cached_docs = get_cached_docs(key)
     if cached_docs is not None:
         print(f"✅ Using in-memory cached documents ({len(cached_docs)} docs)")
         docs = cached_docs
     else:
         print("🔄 Loading documents...")
-        knowledge_base = get_knowledge_base()
         docs = [
             {"id": doc.id, "text": doc.content, "title": doc.title}
             for doc in knowledge_base.documents.values()
         ]
-        set_cached_docs(docs)
+        set_cached_docs(docs, key)
         print(f"✅ Loaded {len(docs)} documents")
 
     if embedder_configs:

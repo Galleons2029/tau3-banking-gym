@@ -6,7 +6,6 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from deepdiff import DeepDiff
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -57,6 +56,8 @@ def show_dict_diff(dict1: dict, dict2: dict) -> str:
     """
     Show the difference between two dictionaries.
     """
+    from deepdiff import DeepDiff
+
     diff = DeepDiff(dict1, dict2)
     return diff
 

@@ -1770,6 +1770,7 @@ all = [
     { name = "ruff" },
     { name = "scikit-learn" },
     { name = "seaborn" },
+    { name = "tiktoken" },
 ]
 dev = [
     { name = "pre-commit" },
@@ -1789,6 +1790,9 @@ gym = [
 knowledge = [
     { name = "openai" },
     { name = "rank-bm25" },
+]
+worldgen = [
+    { name = "tiktoken" },
 ]
 
 [package.metadata]
@@ -1819,13 +1823,14 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'experiments'", specifier = ">=1.6.1" },
     { name = "seaborn", marker = "extra == 'experiments'", specifier = ">=0.13.2" },
     { name = "tabulate", specifier = ">=0.9.0" },
-    { name = "tau3", extras = ["knowledge", "gym", "dev", "experiments"], marker = "extra == 'all'" },
+    { name = "tau3", extras = ["knowledge", "gym", "dev", "worldgen", "experiments"], marker = "extra == 'all'" },
     { name = "tenacity", specifier = ">=9.0.0" },
+    { name = "tiktoken", marker = "extra == 'worldgen'", specifier = ">=0.7" },
     { name = "toml", specifier = ">=0.10.2" },
     { name = "typer", specifier = ">=0.12.5" },
     { name = "uvicorn", specifier = ">=0.34.0" },
 ]
-provides-extras = ["knowledge", "gym", "dev", "experiments", "all"]
+provides-extras = ["knowledge", "gym", "dev", "worldgen", "experiments", "all"]
 
 [[package]]
 name = "tenacity"

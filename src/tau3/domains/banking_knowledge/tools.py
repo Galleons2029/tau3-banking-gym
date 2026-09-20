@@ -336,6 +336,9 @@ class KnowledgeTools(ToolKitBase):
     """
 
     db: TransactionalDB
+    # Toolkit whose discoverable methods `give_discoverable_user_tool` hands to
+    # the user. Bound to KnowledgeUserTools at the bottom of this module.
+    user_tool_class: type
 
     def __init__(
         self,
@@ -548,11 +551,11 @@ class KnowledgeTools(ToolKitBase):
         Returns:
             A confirmation message with instructions for the user
         """
-        # Check if the tool exists as a user discoverable method on KnowledgeUserTools
-        if not hasattr(KnowledgeUserTools, discoverable_tool_name):
+        # Check if the tool exists as a user discoverable method on the user toolkit
+        if not hasattr(self.user_tool_class, discoverable_tool_name):
             return f"Error: Unknown discoverable tool '{discoverable_tool_name}'."
 
-        method = getattr(KnowledgeUserTools, discoverable_tool_name)
+        method = getattr(self.user_tool_class, discoverable_tool_name)
         if not getattr(method, DISCOVERABLE_ATTR, False):
             return f"Error: Unknown discoverable tool '{discoverable_tool_name}'."
 
@@ -1468,8 +1471,13 @@ For deposits without available images, the dispute will proceed based on custome
                 "Error: Order may have already been placed for this card replacement."
             )
 
-        # Cancel the old credit card for security
-        if credit_card_account_id in self.db.credit_card_accounts.data:
+        # Versioned synthesis separates the old physical card (cancelled in the
+        # order record) from the continuing credit account. Official defaults
+        # retain their historical account-state behavior.
+        preserve_account = self.db.task_config.data.get("native_runtime", {}).get(
+            "revision"
+        ) == "native_card_lifecycle_v2"
+        if credit_card_account_id in self.db.credit_card_accounts.data and not preserve_account:
             self.db.credit_card_accounts.data[credit_card_account_id]["status"] = (
                 "CLOSED"
             )
@@ -1712,8 +1720,14 @@ For deposits without available images, the dispute will proceed based on custome
         if "No results found" in result or "No records found" in result:
             return f"Error: Credit card account '{credit_card_account_id}' not found."
 
+        transaction_owner = user_id
+        if (self.db.task_config.data.get("native_runtime", {}).get("revision")
+                == "native_card_lifecycle_v2"):
+            # Separate credits on different accounts; repeated writes to the
+            # same account retain their deterministic collision protection.
+            transaction_owner = f"{user_id}:{credit_card_account_id}"
         transaction_id = generate_transaction_id(
-            user_id, "STATEMENT_CREDIT", reason, amount, "Statement Credit"
+            transaction_owner, "STATEMENT_CREDIT", reason, amount, "Statement Credit"
         )
 
         today = get_today_str()
@@ -2259,8 +2273,26 @@ For deposits without available images, the dispute will proceed based on custome
         except (ValueError, TypeError):
             current_limit = 0.0
 
-        # Update the credit limit
+        # Only explicitly marked synthetic tasks update the submitted request.
+        # Unmarked official tasks retain the historical add-only behavior.
         new_limit = float(new_credit_limit)
+        native_approval = self.db.task_config.data.get("native_runtime", {}).get(
+            "revision"
+        ) in {"native_cli_approval_v1", "native_card_lifecycle_v2"}
+        request_id = generate_credit_limit_increase_request_id(
+            credit_card_account_id, user_id, new_limit - current_limit
+        )
+        pending = self.db.credit_limit_increase_requests.data.get(request_id)
+        if native_approval and (
+            new_limit <= current_limit
+            or pending is None
+            or pending.get("status") != "PENDING"
+            or pending.get("credit_card_account_id") != credit_card_account_id
+            or pending.get("user_id") != user_id
+            or pending.get("requested_increase_amount") != new_limit - current_limit
+        ):
+            return "Error: No matching pending credit limit increase request."
+
         self.db.credit_card_accounts.data[credit_card_account_id]["credit_limit"] = (
             f"${new_limit:.2f}"
         )
@@ -2283,12 +2315,17 @@ For deposits without available images, the dispute will proceed based on custome
             "status": "APPROVED",
         }
 
-        add_to_db(
-            "credit_limit_increase_requests",
-            request_id,
-            approval_record,
-            db=self.db,
-        )
+        if native_approval:
+            self.db.credit_limit_increase_requests.data[request_id] = {
+                **pending, **approval_record
+            }
+        else:
+            add_to_db(
+                "credit_limit_increase_requests",
+                request_id,
+                approval_record,
+                db=self.db,
+            )
 
         return (
             f"Credit limit increase approved!\n"
@@ -4758,3 +4795,9 @@ class KnowledgeUserTools(ToolKitBase):
             f"  - Date: {today}\n"
             f"  - Rewards Earned: {points_earned} points ({reward_rate}% cashback rate)\n"
         )
+
+
+# Bound here because KnowledgeUserTools is defined after KnowledgeTools. Synthesized
+# worlds point this at an aliased subclass so `give_discoverable_user_tool` resolves
+# the tool names their knowledge base actually documents.
+KnowledgeTools.user_tool_class = KnowledgeUserTools

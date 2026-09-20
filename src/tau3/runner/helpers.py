@@ -49,6 +49,7 @@ def get_tasks(
     task_split_name: Optional[str] = None,
     task_ids: Optional[list[str]] = None,
     num_tasks: Optional[int] = None,
+    task_bundle: Optional[str] = None,
 ) -> list[Task]:
     """Load tasks with optional filtering by IDs and count.
 
@@ -64,7 +65,13 @@ def get_tasks(
     Raises:
         ValueError: If task_ids are specified but some are not found.
     """
-    if task_ids is None:
+    if task_bundle is not None:
+        from tau3.synthesis.bundle import load_task_bundle
+
+        tasks = load_task_bundle(task_bundle, task_split_name)
+        if task_ids is not None:
+            tasks = [task for task in tasks if task.id in task_ids]
+    elif task_ids is None:
         tasks = load_tasks(task_set_name=task_set_name, task_split_name=task_split_name)
     else:
         tasks = [
@@ -140,7 +147,26 @@ def get_info(config: RunConfig, **overrides) -> Info:
     if policy_override is not None:
         environment_info.policy = policy_override
 
+    world_identity = {}
+    if config.domain == "banking_synth":
+        from tau3.domains.banking_synth.environment import _is_v2
+        from tau3.worldgen.world import configured_world_root
+
+        root = configured_world_root()
+        if _is_v2(root):
+            from tau3.worldgen.v2.pipeline import artifact_hashes, implementation_hash
+            from tau3.worldgen.v2.runtime import digest
+            from tau3.worldgen.v2.settings import load_settings
+
+            world_identity = {
+                "world_artifact_hash": digest(artifact_hashes(root)),
+                "world_implementation_hash": implementation_hash(),
+                "world_evaluation_hash": digest(load_settings().model_dump()),
+            }
+
     return Info(
+        **world_identity,
+        task_bundle=getattr(config, "task_bundle", None),
         git_commit=get_commit_hash(),
         num_trials=config.num_trials,
         max_steps=config.effective_max_steps,

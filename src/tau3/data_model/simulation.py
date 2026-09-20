@@ -28,6 +28,7 @@ from tau3.config import (
 from tau3.data_model.message import Message
 from tau3.data_model.persona import PersonaConfig
 from tau3.data_model.tasks import Action, EnvAssertion, RewardType, Task
+from tau3.domains.knowledge_domains import KNOWLEDGE_DOMAINS
 from tau3.environment.environment import EnvironmentInfo
 from tau3.environment.toolkit import ToolType
 from tau3.utils.utils import get_now
@@ -42,6 +43,9 @@ class BaseRunConfig(BaseModel):
     """
 
     # ---- Domain and task selection ----
+    task_bundle: Optional[str] = Field(
+        default=None, description="Published synthetic task bundle directory."
+    )
     domain: Annotated[
         str,
         Field(
@@ -252,7 +256,23 @@ class BaseRunConfig(BaseModel):
         default has exactly one source of truth. Imported lazily: the domain
         package imports this module, so a top-level import would cycle.
         """
-        if self.domain == "banking_knowledge" and self.retrieval_config is None:
+        if self.task_bundle is not None:
+            from tau3.synthesis.bundle import load_bundle_manifest
+
+            manifest = load_bundle_manifest(self.task_bundle)
+            if self.domain != manifest["domain"]:
+                raise ValueError("Task bundle domain does not match run domain")
+            if self.task_set_name is not None:
+                raise ValueError("task_bundle and task_set_name are mutually exclusive")
+            if self.retrieval_config is None:
+                object.__setattr__(
+                    self, "retrieval_config", manifest["retrieval"]["name"]
+                )
+                if self.retrieval_config_kwargs is None:
+                    object.__setattr__(
+                        self, "retrieval_config_kwargs", manifest["retrieval"]["kwargs"]
+                    )
+        if self.domain in KNOWLEDGE_DOMAINS and self.retrieval_config is None:
             from tau3.domains.banking_knowledge.retrieval import (
                 DEFAULT_RETRIEVAL_VARIANT,
             )
@@ -828,6 +848,19 @@ class UserInfo(BaseModel):
 class Info(BaseModel):
     """Information about the simulator."""
 
+    task_bundle: Optional[str] = Field(
+        default=None, description="Source task bundle, if any."
+    )
+    world_artifact_hash: Optional[str] = Field(
+        default=None, description="Exact V2 world artifact identity at run creation."
+    )
+    world_implementation_hash: Optional[str] = Field(
+        default=None, description="V2 generator/runtime implementation identity."
+    )
+    world_evaluation_hash: Optional[str] = Field(
+        default=None,
+        description="V2 actor/judge settings identity without exposing request credentials.",
+    )
     git_commit: str = Field(description="The git commit hash.")
     num_trials: int = Field(description="The number of trials.")
     max_steps: int = Field(description="The maximum number of steps.")

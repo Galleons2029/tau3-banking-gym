@@ -6,6 +6,20 @@
 
 τ-bench is a simulation framework for evaluating conversational customer service agents. It runs text half-duplex (turn-based) simulations. Domains are `banking_knowledge` and `mock`.
 
+## Knowledge Base (`wiki/`)
+
+`wiki/` is a knowledge base compiled over this repository and maintained entirely by the agent, following the llm-wiki pattern (`wiki/llm-wiki.md`). It exists because this repo's docs drift behind the code and the load-bearing knowledge — evaluation mechanics, retrieval defaults, known environment defects — is spread across many files. It is **gitignored**: local to a checkout, never committed, so it may be absent. If `wiki/index.md` exists, use it.
+
+**Read `wiki/index.md` before searching the codebase.** It is a one-page catalog — locate the relevant page, drill in, and fall back to reading source files only when no page covers the question or the page is marked `status: stale`. `wiki/overview.md` orients a cold start; `wiki/log.md` records what happened recently.
+
+Keep it current — it is only as useful as its last update:
+
+- **After answering a question by real synthesis** (a comparison, a mechanism walk-through, a failure analysis), file the answer back as a page under `wiki/notes/`, then update `wiki/index.md` and `wiki/log.md`. Otherwise the work is lost to chat history.
+- **After changing code or docs that a page cites**, update those pages (`wiki/sources.md` maps source → pages), refresh their `sources:` (`path@commit`) and `updated:` frontmatter, and append a `wiki/log.md` entry.
+- **After a large merge, or roughly every 10 ingests**, run the drift / orphan / dead-link / filename-uniqueness lint in `wiki/CLAUDE.md`.
+
+`wiki/CLAUDE.md` is the schema — **read it before writing anything under `wiki/`**; inside that directory it takes precedence over this file. Its standing rules: truth precedence is **code > docs > inference**, and a conflict is recorded in `wiki/notes/contradictions.md` rather than silently resolved; pages are written in English; wikilinks use the bare filename (`[[evaluation-and-reward]]`, never a path).
+
 ## Setup
 
 ```bash
@@ -179,6 +193,7 @@ test: add integration tests for retail domain
 - **`data/` directory**: Contains domain data that the framework depends on. Be careful modifying JSON/TOML data files.
 - **`config.py`**: Single source of truth for default configuration values. Import constants from here rather than defining local duplicates.
 - **`registry.py`**: All new agents, domains, and user simulators must be registered here to be usable via CLI.
+- **`wiki/` directory**: Agent-maintained knowledge base, gitignored — never commit it, and read `wiki/CLAUDE.md` before editing any page. Stale pages are its main failure mode: when you change code a page cites, update the page in the same session.
 - **Task splits**: The `base` split is the default for evaluation. The `train`/`test` splits are for RL experiments.
 - **Pre-commit hook**: Runs `make check-all` (ruff lint + format). Fix any issues before committing.
 - **Notebooks**: Excluded from ruff (`*.ipynb` in pyproject.toml exclude).

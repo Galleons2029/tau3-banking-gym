@@ -1,68 +1,79 @@
-"""
-Tau3: Conversational Agent Benchmark Framework
+"""Tau3 conversational agent benchmark framework.
 
-Main exports for easy access to key components.
+Public objects are imported lazily so lightweight commands such as ``tau3 web`` do
+not pay the import cost of the simulation and LLM stacks during startup.
 """
 
+from __future__ import annotations
+
+import importlib
 import warnings
+from typing import Any
 
-# Runner package: clean API for simulation execution
-# - Layer 1: run_simulation (execute pre-built orchestrator)
-# - Layer 2: build_* functions (construct instances from config/names)
-# - Layer 3: run_domain, run_tasks, run_single_task (batch execution)
-import tau3.runner as runner
-from tau3.agent.base.llm_config import LLMConfigMixin
-from tau3.agent.base_agent import HalfDuplexAgent
-from tau3.agent.llm_agent import LLMAgent, LLMSoloAgent
-from tau3.data_model.simulation import (
-    BaseRunConfig,
-    RunConfig,
-    SimulationRun,
-    TextRunConfig,
-)
-from tau3.data_model.tasks import Task
-from tau3.environment.environment import Environment
-from tau3.evaluator.evaluator import EvaluationType, evaluate_simulation
-from tau3.orchestrator.orchestrator import Orchestrator
-from tau3.registry import Registry, registry
-from tau3.run import run_domain
-from tau3.user.user_simulator import UserSimulator
-from tau3.user.user_simulator_base import HalfDuplexUser
-from tau3.utils.display import ConsoleDisplay, MarkdownDisplay
+_EXPORTS: dict[str, tuple[str, str | None]] = {
+    "runner": ("tau3.runner", None),
+    "LLMConfigMixin": ("tau3.agent.base.llm_config", "LLMConfigMixin"),
+    "HalfDuplexAgent": ("tau3.agent.base_agent", "HalfDuplexAgent"),
+    "LLMAgent": ("tau3.agent.llm_agent", "LLMAgent"),
+    "LLMSoloAgent": ("tau3.agent.llm_agent", "LLMSoloAgent"),
+    "BaseRunConfig": ("tau3.data_model.simulation", "BaseRunConfig"),
+    "RunConfig": ("tau3.data_model.simulation", "RunConfig"),
+    "SimulationRun": ("tau3.data_model.simulation", "SimulationRun"),
+    "TextRunConfig": ("tau3.data_model.simulation", "TextRunConfig"),
+    "Task": ("tau3.data_model.tasks", "Task"),
+    "Environment": ("tau3.environment.environment", "Environment"),
+    "EvaluationType": ("tau3.evaluator.evaluator", "EvaluationType"),
+    "evaluate_simulation": ("tau3.evaluator.evaluator", "evaluate_simulation"),
+    "Orchestrator": ("tau3.orchestrator.orchestrator", "Orchestrator"),
+    "Registry": ("tau3.registry", "Registry"),
+    "registry": ("tau3.registry", "registry"),
+    "run_domain": ("tau3.run", "run_domain"),
+    "UserSimulator": ("tau3.user.user_simulator", "UserSimulator"),
+    "HalfDuplexUser": ("tau3.user.user_simulator_base", "HalfDuplexUser"),
+    "ConsoleDisplay": ("tau3.utils.display", "ConsoleDisplay"),
+    "MarkdownDisplay": ("tau3.utils.display", "MarkdownDisplay"),
+}
 
-# =============================================================================
-# DEPRECATION ALIASES
-# =============================================================================
+_DEPRECATED_ALIASES = {
+    "BaseAgent": "HalfDuplexAgent",
+    "LocalAgent": "HalfDuplexAgent",
+    "BaseUser": "HalfDuplexUser",
+}
 
 
-def __getattr__(name: str):
-    """Module-level __getattr__ for deprecation warnings."""
-    deprecated_aliases = {
-        "BaseAgent": ("HalfDuplexAgent", HalfDuplexAgent),
-        "LocalAgent": ("HalfDuplexAgent", HalfDuplexAgent),
-        "BaseUser": ("HalfDuplexUser", HalfDuplexUser),
-    }
+def _load_export(name: str) -> Any:
+    module_name, attribute = _EXPORTS[name]
+    module = importlib.import_module(module_name)
+    value = module if attribute is None else getattr(module, attribute)
+    globals()[name] = value
+    return value
 
-    if name in deprecated_aliases:
-        new_name, new_class = deprecated_aliases[name]
+
+def __getattr__(name: str) -> Any:
+    """Resolve the stable public API only when a caller first accesses it."""
+
+    if name in _DEPRECATED_ALIASES:
+        replacement = _DEPRECATED_ALIASES[name]
         warnings.warn(
-            f"{name} is deprecated, use {new_name} instead",
+            f"{name} is deprecated, use {replacement} instead",
             DeprecationWarning,
             stacklevel=2,
         )
-        return new_class
-
+        value = _load_export(replacement)
+        globals()[name] = value
+        return value
+    if name in _EXPORTS:
+        return _load_export(name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-# Direct aliases for static analysis tools
-BaseAgent = HalfDuplexAgent
-LocalAgent = HalfDuplexAgent
-BaseUser = HalfDuplexUser
+def __dir__() -> list[str]:
+    """Include lazy public exports in interactive discovery."""
+
+    return sorted(set(globals()) | set(__all__))
 
 
 __all__ = [
-    # Core
     "Orchestrator",
     "LLMAgent",
     "LLMSoloAgent",
@@ -82,10 +93,8 @@ __all__ = [
     "RunConfig",
     "run_domain",
     "runner",
-    # Utils
     "ConsoleDisplay",
     "MarkdownDisplay",
-    # Deprecated aliases (kept for backward compatibility)
     "BaseAgent",
     "LocalAgent",
     "BaseUser",

@@ -1,4 +1,4 @@
-from typing import Generic, Optional, Tuple, TypeVar
+from typing import Generic, Literal, Optional, Tuple, TypeVar
 
 from loguru import logger
 
@@ -13,6 +13,7 @@ from tau3.data_model.message import (
 )
 from tau3.data_model.persona import PersonaConfig
 from tau3.environment.tool import Tool
+from tau3.user.role_guard import guard_customer_prompt
 from tau3.user.user_simulator_base import (
     OUT_OF_SCOPE,
     STOP,
@@ -22,47 +23,24 @@ from tau3.user.user_simulator_base import (
     ValidUserInputMessage,
     is_valid_user_history_message,
 )
-from tau3.utils import DATA_DIR
+from tau3.user_prompt import (
+    GLOBAL_USER_SIM_GUIDELINES_DIR,
+    GLOBAL_USER_SIM_GUIDELINES_PATH,
+    GLOBAL_USER_SIM_GUIDELINES_PATH_TOOLS,
+    SYSTEM_PROMPT,
+    build_user_system_prompt,
+    get_global_user_sim_guidelines,
+)
 from tau3.utils.llm_utils import generate
 
-GLOBAL_USER_SIM_GUIDELINES_DIR = DATA_DIR / "tau3" / "user_simulator"
-
-
-GLOBAL_USER_SIM_GUIDELINES_PATH = (
-    GLOBAL_USER_SIM_GUIDELINES_DIR / "simulation_guidelines.md"
-)
-
-GLOBAL_USER_SIM_GUIDELINES_PATH_TOOLS = (
-    GLOBAL_USER_SIM_GUIDELINES_DIR / "simulation_guidelines_tools.md"
-)
-
-
-def get_global_user_sim_guidelines(use_tools: bool = False) -> str:
-    """
-    Get the global user simulator guidelines.
-
-    Args:
-        use_tools: Whether to use the tools guidelines.
-
-    Returns:
-        The global user simulator guidelines.
-    """
-    if use_tools:
-        with open(GLOBAL_USER_SIM_GUIDELINES_PATH_TOOLS, "r") as fp:
-            user_sim_guidelines = fp.read()
-    else:
-        with open(GLOBAL_USER_SIM_GUIDELINES_PATH, "r") as fp:
-            user_sim_guidelines = fp.read()
-    return user_sim_guidelines
-
-
-SYSTEM_PROMPT = """
-{global_user_sim_guidelines_with_persona}
-
-<scenario>
-{instructions}
-</scenario>
-""".strip()
+__all__ = [
+    "GLOBAL_USER_SIM_GUIDELINES_DIR",
+    "GLOBAL_USER_SIM_GUIDELINES_PATH",
+    "GLOBAL_USER_SIM_GUIDELINES_PATH_TOOLS",
+    "SYSTEM_PROMPT",
+    "UserSimulator",
+    "get_global_user_sim_guidelines",
+]
 
 
 UserStateType = TypeVar("UserStateType", bound="UserState")
@@ -90,6 +68,7 @@ class UserSimulator(
         persona_config: Optional[
             PersonaConfig
         ] = None,  # TODO: Should this be pushed to the base class?
+        customer_role_guard: bool | Literal["customer_role_v1", "customer_role_v2"] = False,
     ):
         super().__init__(
             instructions=instructions,
@@ -98,6 +77,7 @@ class UserSimulator(
             llm_args=llm_args,
         )
         self.persona_config = persona_config or PersonaConfig()
+        self.customer_role_guard = customer_role_guard
 
     @property
     def global_simulation_guidelines(self) -> str:
@@ -115,23 +95,15 @@ class UserSimulator(
         if self.instructions is None:
             logger.warning("No instructions provided for user simulator")
 
-        guidelines = self.global_simulation_guidelines
-
-        # Check if persona config adds any guidelines
-        persona_guidelines = self.persona_config.to_guidelines_text()
-        if persona_guidelines is None:
-            persona_guidelines = ""
-        if persona_guidelines:
-            persona_guidelines = f"\n\n{persona_guidelines}\n"
-        guidelines_with_persona = guidelines.replace(
-            "<PERSONA_GUIDELINES>", persona_guidelines
-        )
-
-        system_prompt = SYSTEM_PROMPT.format(
-            global_user_sim_guidelines_with_persona=guidelines_with_persona,
+        prompt = build_user_system_prompt(
             instructions=self.instructions,
+            persona_guidelines=self.persona_config.to_guidelines_text(),
+            use_tools=self.tools is not None,
         )
-        return system_prompt
+        if not self.customer_role_guard:
+            return prompt
+        revision = "customer_role_v1" if self.customer_role_guard is True else self.customer_role_guard
+        return guard_customer_prompt(prompt, revision=revision)
 
     def get_init_state(
         self, message_history: Optional[list[Message]] = None

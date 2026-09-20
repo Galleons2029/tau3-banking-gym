@@ -1,3 +1,4 @@
+import inspect
 import json
 from copy import deepcopy
 from datetime import date, datetime
@@ -472,6 +473,16 @@ class Environment:
         """
         error = False
         try:
+            # Validate the target signature before expansion into the dispatcher.
+            # Otherwise a malformed `tool_name` argument collides with the
+            # dispatcher's own selector and obscures the actual model error.
+            owner = self.user_tools if message.requestor == "user" else self.tools
+            target = getattr(owner, message.name, None)
+            if callable(target) and {"tool_name", "requestor"} & message.arguments.keys():
+                try:
+                    inspect.signature(target).bind(**message.arguments)
+                except TypeError as exc:
+                    raise ValueError(f"Invalid arguments for {message.name}: {exc}") from exc
             resp = self.make_tool_call(
                 message.name, requestor=message.requestor, **message.arguments
             )

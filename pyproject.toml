@@ -49,6 +49,9 @@ dev = [
     "ruff>=0.9.1",
     "pre-commit>=4.0.0",
 ]
+worldgen = [
+    "tiktoken>=0.7",
+]
 experiments = [
     "plotly>=6.0.0",
     "matplotlib>=3.10.1",
@@ -56,7 +59,7 @@ experiments = [
     "scikit-learn>=1.6.1",
 ]
 all = [
-    "tau3[knowledge,gym,dev,experiments]",
+    "tau3[knowledge,gym,dev,worldgen,experiments]",
 ]
 [project.urls]
 Homepage = "https://taubench.com/"
@@ -64,6 +67,9 @@ Repository = "https://github.com/sierra-research/tau2-bench"
 
 [project.scripts]
 tau3 = "tau3.cli:main"
+
+[tool.hatch.build.targets.wheel.force-include]
+"web/visualizer/dist" = "tau3/web_console/static"
 
 [tool.pytest.ini_options]
 filterwarnings = [

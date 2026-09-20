@@ -72,6 +72,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+test/
 
 # Translations
 *.mo
@@ -199,12 +200,30 @@ data-*-of-*.arrow
 src/experiments/model_training/data/full-v1/*/cache-*.arrow
 src/experiments/model_training/data/full-v1/*/data-*.arrow
 data/.embeddings_cache/
+data/tau3-dev/
+data/hotel_tau3/
+data/synthetic/
+# Perturbation snapshots and materialized variants are build artifacts,
+# reproducible from the committed plans in configs/perturb/plans/.
+data/variants/
+data/
 
 # Large JSONL training files
 src/experiments/model_training/data/train_full-v1.jsonl
 src/experiments/model_training/data/test_full-v1.jsonl
+# Iterative targeted-synthesis repair artifacts are generated data, not configs.
+configs/synthesis/targeted-native-v03-r10-repair*.json
+configs/synthesis/targeted-native-v03-r10.json
 data/simulations/.credentials/
 !data/simulations/knowledge/
+
+# Local web-console runtime records and recoverable backups.
+data/calibrations/jobs/
+data/calibrations/backups/
+
+# The console build is packaged and served by FastAPI.
+!web/visualizer/dist/
+!web/visualizer/dist/**
 
 # LaTeX build artifacts
 *.aux
@@ -224,3 +243,5 @@ data/simulations/.credentials/
 
 # Cursor IDE
 .cursor/
+
+wiki/

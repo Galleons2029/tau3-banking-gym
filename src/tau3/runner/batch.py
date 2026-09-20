@@ -34,6 +34,7 @@ from tau3.data_model.simulation import (
     UserInfo,
 )
 from tau3.data_model.tasks import Task
+from tau3.domains.knowledge_domains import KNOWLEDGE_DOMAINS
 from tau3.evaluator.evaluator import EvaluationType
 from tau3.metrics.agent_metrics import compute_metrics
 from tau3.registry import registry
@@ -529,11 +530,11 @@ def prepare_batch(
 
     user_persona_config = None
 
-    # Warm knowledge base cache for banking_knowledge domain
+    # Warm the knowledge base cache for whichever knowledge domain is running.
     policy_override = None
-    if config.domain == "banking_knowledge":
-        from tau3.domains.banking_knowledge.environment import get_knowledge_base
+    if config.domain in KNOWLEDGE_DOMAINS:
         from tau3.domains.banking_knowledge.retrieval import get_info_policy_override
+        from tau3.domains.knowledge_domains import knowledge_base_for
         from tau3.knowledge.embeddings_cache import (
             get_unique_embedder_configs_for_retrieval_configs,
             warm_kb_cache,
@@ -548,8 +549,8 @@ def prepare_batch(
                 [retrieval_config],
                 kwargs,
             )
-        warm_kb_cache(embedder_configs)
-        knowledge_base = get_knowledge_base()
+        knowledge_base = knowledge_base_for(config.domain)
+        warm_kb_cache(embedder_configs, knowledge_base)
         policy_override = get_info_policy_override(
             retrieval_config, knowledge_base, **kwargs
         )
@@ -809,6 +810,7 @@ def _load_run_tasks(config: RunConfig) -> list[Task]:
         task_split_name=config.task_split_name,
         task_ids=config.task_ids,
         num_tasks=config.num_tasks,
+        **({"task_bundle": config.task_bundle} if config.task_bundle else {}),
     )
 
     effective_agent = config.effective_agent

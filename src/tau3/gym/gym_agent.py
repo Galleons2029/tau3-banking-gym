@@ -50,6 +50,21 @@ TAU_BENCH_USER_ENV_VERSION = "v0"
 TAU_BENCH_USER_ENV_ID = f"{TAU_BENCH_USER_ENV_NAME}-{TAU_BENCH_USER_ENV_VERSION}"
 
 
+def _bundle_retrieval(domain, task_bundle, retrieval_config, retrieval_kwargs):
+    """Resolve bundle defaults while preserving explicit diagnostic overrides."""
+    if task_bundle is not None:
+        from tau3.synthesis.bundle import load_bundle_manifest
+
+        manifest = load_bundle_manifest(task_bundle)
+        if manifest["domain"] != domain:
+            raise ValueError("Task bundle domain does not match Gym domain")
+        if retrieval_config is None:
+            retrieval_config = manifest["retrieval"]["name"]
+            if retrieval_kwargs is None:
+                retrieval_kwargs = manifest["retrieval"]["kwargs"]
+    return retrieval_config, retrieval_kwargs
+
+
 class TauSpace(gym.spaces.Space):
     """
     A space for the tau-bench gym environment.
@@ -596,6 +611,8 @@ class AgentGymEnv(gym.Env):
         all_messages_as_observation: bool = False,
         retrieval_config: Optional[str] = None,
         retrieval_config_kwargs: Optional[dict] = None,
+        task_bundle: Optional[str] = None,
+        task_split_name: Optional[str] = None,
     ):
         """
         Initialize the Tau3 gym environment.
@@ -616,8 +633,11 @@ class AgentGymEnv(gym.Env):
             user_llm_args if user_llm_args else deepcopy(DEFAULT_LLM_ARGS_USER)
         )
         self.all_messages_as_observation = all_messages_as_observation
-        self.retrieval_config = retrieval_config
-        self.retrieval_config_kwargs = retrieval_config_kwargs
+        self.task_bundle = task_bundle
+        self.task_split_name = task_split_name
+        self.retrieval_config, self.retrieval_config_kwargs = _bundle_retrieval(
+            domain, task_bundle, retrieval_config, retrieval_config_kwargs
+        )
 
         self._lock = threading.Lock()
         self._episode_env: Optional[Environment] = None
@@ -1008,7 +1028,12 @@ class AgentGymEnv(gym.Env):
                        for the given domain
         """
         if self._episode_task is None:
-            tasks = registry.get_tasks_loader(self.domain)()
+            if self.task_bundle is not None:
+                from tau3.synthesis.bundle import load_task_bundle
+
+                tasks = load_task_bundle(self.task_bundle, self.task_split_name)
+            else:
+                tasks = registry.get_tasks_loader(self.domain)()
             for task in tasks:
                 if task.id == self.task_id:
                     self._episode_task = task
@@ -1165,6 +1190,8 @@ class UserGymEnv(gym.Env):
         all_messages_as_observation: bool = False,
         retrieval_config: Optional[str] = None,
         retrieval_config_kwargs: Optional[dict] = None,
+        task_bundle: Optional[str] = None,
+        task_split_name: Optional[str] = None,
     ):
         """
         Initialize the Tau3 user gym environment.
@@ -1188,8 +1215,11 @@ class UserGymEnv(gym.Env):
             agent_llm_args if agent_llm_args else deepcopy(DEFAULT_LLM_ARGS_AGENT)
         )
         self.all_messages_as_observation = all_messages_as_observation
-        self.retrieval_config = retrieval_config
-        self.retrieval_config_kwargs = retrieval_config_kwargs
+        self.task_bundle = task_bundle
+        self.task_split_name = task_split_name
+        self.retrieval_config, self.retrieval_config_kwargs = _bundle_retrieval(
+            domain, task_bundle, retrieval_config, retrieval_config_kwargs
+        )
 
         self._lock = threading.Lock()
         self._episode_env: Optional[Environment] = None
@@ -1525,7 +1555,12 @@ class UserGymEnv(gym.Env):
             ValueError: If no task is found with the specified task_id
         """
         if self._episode_task is None:
-            tasks = registry.get_tasks_loader(self.domain)()
+            if self.task_bundle is not None:
+                from tau3.synthesis.bundle import load_task_bundle
+
+                tasks = load_task_bundle(self.task_bundle, self.task_split_name)
+            else:
+                tasks = registry.get_tasks_loader(self.domain)()
             for task in tasks:
                 if task.id == self.task_id:
                     self._episode_task = task

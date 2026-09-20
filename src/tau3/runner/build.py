@@ -15,6 +15,7 @@ from tau3.agent.base_agent import HalfDuplexAgent
 from tau3.data_model.persona import PersonaConfig
 from tau3.data_model.simulation import RunConfig, TextRunConfig
 from tau3.data_model.tasks import Task
+from tau3.domains.knowledge_domains import KNOWLEDGE_DOMAINS
 from tau3.environment.environment import Environment
 from tau3.orchestrator.orchestrator import Orchestrator
 from tau3.registry import registry
@@ -214,7 +215,7 @@ def build_env_kwargs(
         rk = dict(retrieval_config_kwargs or {})
         if rk:
             env_kwargs["retrieval_kwargs"] = rk
-    if domain == "banking_knowledge":
+    if domain in KNOWLEDGE_DOMAINS:
         env_kwargs["read_log_allowlist"] = _derive_read_log_allowlist(task)
     return env_kwargs
 
