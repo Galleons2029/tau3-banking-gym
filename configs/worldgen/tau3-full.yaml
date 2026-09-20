@@ -1,0 +1,51 @@
+# Full scale: the official corpus's shape (698 documents, 71 topics, 97 tasks).
+# Mini slice: proves the A-to-H loop before scaling to 698 documents / 97 tasks.
+# All four roles use the self-hosted OpenAI-compatible gateway; it does not check
+# credentials, so api_key is a placeholder LiteLLM's openai provider requires.
+generator_model: openai/gemini-3.5-flash
+teacher_model: openai/gemini-3.5-flash
+user_model: openai/gemini-3.5-flash
+judge_model: openai/gemini-3.5-flash
+seed: 42
+concurrency: 128
+suffix_salt: tau3-world-tiered-v1
+text_mode: llm
+retrieval_config: bm25_grep
+top_k: 10
+max_steps: 100
+llm_args:
+  api_base: http://10.39.62.231:9091/v1
+  api_key: not-required
+  temperature: 0
+  timeout: 600
+  num_retries: 2
+  max_retries: 0
+
+# gemini-3.5-flash spends most of its completion budget on reasoning tokens before
+# emitting JSON (measured: 292 of 312 tokens on an 87-character answer), so these
+# budgets are an order of magnitude above what a non-reasoning model needs.
+structured_attempts: 3
+generator_llm_args:
+  timeout: 600
+  max_tokens: 16384
+judge_llm_args:
+  timeout: 900
+  max_tokens: 16384
+structured_token_limit: 32768
+structured_timeout_limit: 1800
+
+# Slice size. Scaling to the full corpus changes only these.
+num_categories: 4
+num_topics: 71
+num_documents: 698
+num_tasks: 97
+num_noise_users: 300
+variables_per_product: 16
+# Documents rotate between these so a retriever cannot separate them by author.
+# Of the seven models the endpoint advertises, deepseek-v4-*, claude-4.8-opus and
+# seed-2.0-pro fail with an invalid key, an exhausted budget and an unavailable
+# resource respectively.
+render_models:
+  - openai/gemini-3.5-flash
+  - openai/GLM-5.3-Flash
+leak_divisor: 10

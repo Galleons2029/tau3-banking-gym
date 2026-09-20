@@ -1,0 +1,30 @@
+# All roles use the OpenAI-compatible endpoint configured in .env.
+generator_model: openai/GLM-5.3-Flash
+teacher_model: openai/GLM-5.3-Flash
+user_model: openai/GLM-5.3-Flash
+judge_model: openai/GLM-5.3-Flash
+seed: 42
+concurrency: 32
+candidate_attempts: 10
+text_revisions: 2
+text_mode: llm
+retrieval_config: bm25_grep
+top_k: 10
+max_steps: 100
+llm_args:
+  temperature: 0
+  timeout: 300
+  num_retries: 2
+  max_retries: 0
+
+# Constrained decoding is restricted to synthesis and review, never dialogue agents.
+structured_attempts: 2
+generator_llm_args:
+  timeout: 300
+  max_tokens: 4096
+judge_llm_args:
+  timeout: 900
+  max_tokens: 8192
+# Only a length-terminated structured call can grow its retry budget up to these caps.
+structured_token_limit: 16384
+structured_timeout_limit: 1800

@@ -1,0 +1,18 @@
+# Bounded transport recovery; every audit attempt is recorded and budgeted.
+agent_models:
+  - openai/gemini-3.5-flash
+  - openai/GLM-5.3-Flash
+user_model: openai/gemini-3.5-flash
+judge_model: openai/GLM-5.3-Flash
+simulation_max_steps: 80
+simulation_timeout: 1800
+audit_transport_attempts: 3
+llm_args:
+  api_base: http://10.39.62.231:9091/v1
+  api_key: not-required
+  temperature: 0
+  max_tokens: 65536
+  timeout: 300
+  num_retries: 2
+  extra_body:
+    reasoning_effort: high

@@ -1,0 +1,16 @@
+# User-selected high reasoning; preserve the low experiment separately.
+agent_models:
+  - openai/gemini-3.5-flash
+  - openai/GLM-5.3-Flash
+user_model: openai/gemini-3.5-flash
+judge_model: openai/GLM-5.3-Flash
+simulation_timeout: 900
+llm_args:
+  api_base: http://10.39.62.231:9091/v1
+  api_key: not-required
+  temperature: 0
+  max_tokens: 65536
+  timeout: 180
+  num_retries: 0
+  extra_body:
+    reasoning_effort: high

@@ -1,0 +1,9 @@
+{
+  "checkpoint": "/cpfs/user/liujialong/model/tau3.v0.2/iter_0000074_hf_fp8_infra",
+  "purpose": "User-supplied tokenizer and chat-template reference; external receipt binds actual training checkpoints",
+  "max_length": 131072,
+  "enable_thinking": true,
+  "clear_thinking": false,
+  "adapter": "tau3.synthesis.targeted.native.training.encode_sample",
+  "sampling": "uniform task, then uniform qualified trajectory within task"
+}

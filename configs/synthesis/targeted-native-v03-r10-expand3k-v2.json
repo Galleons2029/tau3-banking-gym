@@ -1,0 +1,71 @@
+{
+  "schema_version": 2,
+  "seed": 44000,
+  "num_tasks": 3000,
+  "pilot_tasks": 20,
+  "trials": 4,
+  "candidate_attempts": 3,
+  "max_total_calls": 1000000,
+  "max_total_tokens": 40000000000,
+  "max_audit_calls": 750000,
+  "max_rollouts": 13980,
+  "workers": 256,
+  "llm_concurrency": 256,
+  "analysis_batch_bytes": 120000,
+  "attribution_timeout": 1800,
+  "teacher_model": "openai/GLM-5.3-Flash",
+  "reviewer_model": "openai/gemini-3.5-flash",
+  "settings": {
+    "agent_models": [
+      "openai/GLM-5.3-Flash",
+      "openai/gemini-3.5-flash"
+    ],
+    "user_model": "openai/gemini-3.5-flash",
+    "judge_model": "openai/gemini-3.5-flash",
+    "simulation_max_steps": 200,
+    "simulation_timeout": 3600,
+    "audit_transport_attempts": 3,
+    "agent_llm_args": {
+      "temperature": 0.7
+    },
+    "user_llm_args": {
+      "temperature": 0
+    },
+    "capture_retrieval": "bm25_grep",
+    "llm_args": {
+      "api_base": "http://10.39.62.231:9091/v1",
+      "api_key": "not-required",
+      "temperature": 0,
+      "max_tokens": 65536,
+      "timeout": 300,
+      "num_retries": 0,
+      "extra_body": {
+        "reasoning_effort": "high"
+      }
+    }
+  },
+  "backend": "banking_native",
+  "small_tasks": 400,
+  "expansion_target_rows": 3000,
+  "validation_tasks": 200,
+  "max_blind_rollouts": 19320,
+  "reasoning_policy": "strict_preserve",
+  "training_contract": "configs/synthesis/targeted-native-training.json",
+  "structured_max_tokens": 16384,
+  "structured_output_mode": "prompt_json",
+  "structured_reasoning_effort": "low",
+  "structured_reviewer_max_tokens": 32768,
+  "structured_reviewer_timeout": 900,
+  "curriculum": "v03_r10",
+  "clean_only": true,
+  "parent_round": "/newcpfs/user/liujialong/gym/tau3-banking-gym/data/synthesis/targeted-native-v03-r10-expand3k-v1",
+  "budget_parent_round": "/newcpfs/user/liujialong/gym/tau3-banking-gym/data/synthesis/targeted-native-v03-r10-expand3k-v1",
+  "reuse_parent_pilot": true,
+  "reuse_parent_splits": [
+    "train",
+    "validation"
+  ],
+  "runtime_revision": "native_card_lifecycle_v2",
+  "user_role_guard": "customer_role_v2",
+  "retained_sft_manifest": "/newcpfs/user/liujialong/gym/tau3-banking-gym/data/synthesis/targeted-native-v03-r10-expand3k-v1/verification/user-role-repair-v1/filtered/manifest.json"
+}
